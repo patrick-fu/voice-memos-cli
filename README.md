@@ -1,2 +1,19 @@
-# voice-memos-cli
-Agent-friendly CLI for searching, exporting, renaming, and deleting macOS Voice Memos
+# Voice Memos CLI
+
+An agent-friendly macOS CLI project for safely searching, inspecting, exporting, renaming, and deleting Voice Memos.
+
+> Status: planning. No production CLI has been implemented yet.
+
+The v0.1 contract is being designed around stable JSON, explicit exit codes, stdout/stderr separation, dry-run and confirmation controls, and the current plus previous major macOS versions.
+
+## Plan
+
+The canonical roadmap is [Plan a safe, agent-friendly macOS Voice Memos CLI](https://github.com/patrick-fu/voice-memos-cli/issues/1). Its child issues hold each decision and the evidence behind it.
+
+Current research found no supported direct Voice Memos data API or transcript write-back interface. Direct private-store mutation is excluded; supported UI/Share paths and opt-in Shortcuts helpers are evaluated separately.
+
+## Research
+
+- [Voice Memos data access boundaries](docs/research/voice-memos-data-access.md)
+- [Transcript write-back feasibility](docs/research/voice-memos-transcript-writeback.md)
+- [Shortcuts bridge feasibility](docs/research/voice-memos-shortcuts-bridge.md)
