@@ -1,0 +1,201 @@
+<!doctype html>
+<!-- THROWAWAY PROTOTYPE — v0.1 CLI contract review only. One page, three variants. Open with ?variant=A|B|C. -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THROWAWAY · vmemo CLI 契约评审</title>
+<style>
+:root{--ink:#102a43;--muted:#52606d;--line:#cbd5e1;--paper:#f8fafc;--card:#fff;--mint:#0f766e;--violet:#5b21b6;--orange:#c2410c;--danger:#b42318;--black:#111;--code:#12263a;--shadow:0 12px 32px #0f172221}
+*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.48 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}h1,h2,h3,p{margin-top:0}h1{font-size:clamp(28px,4vw,48px);line-height:1.04;letter-spacing:-.045em;margin-bottom:10px}h2{font-size:21px;margin-bottom:8px}h3{font-size:14px;margin-bottom:7px}code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}code{padding:1px 4px;border-radius:4px;background:#e8eef5;color:#172554;font-size:.91em}pre{overflow:auto;margin:0;padding:14px;border-radius:10px;background:var(--code);color:#e6edf5;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.ribbon{display:flex;justify-content:space-between;gap:18px;padding:9px clamp(18px,4vw,64px);background:repeating-linear-gradient(135deg,#111 0 14px,#ffd400 14px 28px);color:#fff;font-weight:850;letter-spacing:.03em}.ribbon span{color:#111}.head,.scope,.variant{max-width:1320px;margin-left:auto;margin-right:auto;padding-left:28px;padding-right:28px}.head{padding-top:30px;padding-bottom:18px}.eyebrow{margin-bottom:8px;color:var(--orange);font-size:12px;font-weight:900;letter-spacing:.1em}.lede{max-width:890px;margin:0;color:var(--muted);font-size:17px}.scope{margin-bottom:24px}.scope>div{border:1px solid #f2b344;border-left:6px solid var(--orange);padding:13px 15px;background:#fffbeb}.scope strong{color:#7c2d12}.variant{display:none;margin-bottom:130px}.variant.active{display:block}.tag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:12px;font-weight:800}.good{background:#ccfbf1;color:#115e59}.experimental{background:#f3e8ff;color:#6b21a8}.no{background:#fee2e2;color:#991b1b}.mini,.annotation{color:var(--muted);font-size:13px}.card{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fff}.card.danger{border-color:#fca5a5;background:#fff7f7}.card.exp{border-color:#d8b4fe;background:#faf5ff}.copyline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}.copy{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font-size:12px;font-weight:700}.copy:hover{background:#e0f2fe}.note{margin-top:18px;padding:15px;border:1px solid #94a3b8;border-radius:10px;background:#f1f5f9}.note p{margin:4px 0 0}.switcher{position:fixed;z-index:10;right:50%;bottom:20px;display:flex;align-items:center;gap:4px;transform:translateX(50%);padding:6px;border:2px solid #fff;border-radius:999px;background:var(--black);color:#fff;box-shadow:0 10px 30px #0006}.switcher button{width:34px;height:34px;border:0;border-radius:50%;background:#ffd400;color:#111;font-weight:900}.switcher button:hover{background:#fff}.switcher span{min-width:185px;padding:0 9px;text-align:center;font-size:12px;font-weight:900}
+
+/* A: documentation tree. Resource hierarchy is the primary model. */
+.a-shell{display:grid;grid-template-columns:280px minmax(0,1fr);overflow:hidden;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow)}.a-nav{padding:22px 16px;background:#0f2740;color:#dbeafe}.brand{margin-bottom:24px;color:#fff;font:800 20px ui-monospace,monospace}.a-nav ul{margin:0;padding:0;list-style:none}.a-nav li{padding:7px 10px;border-radius:6px;font:13px ui-monospace,monospace}.a-nav .current{background:#a7f3d0;color:#052e2b;font-weight:900}.a-main{padding:clamp(20px,4vw,42px)}.a-top{display:flex;justify-content:space-between;gap:20px;margin-bottom:20px}.a-title{margin:4px 0;font:800 clamp(24px,4vw,38px) ui-monospace,monospace;letter-spacing:-.05em}.a-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.wide{grid-column:1/-1}.commands{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.command{padding:12px;border:1px solid #dbe4ee;border-radius:9px;background:#f8fafc}.command strong{display:block;margin-bottom:4px;font-family:ui-monospace,monospace}.command p{margin-bottom:0;color:var(--muted);font-size:13px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px}.meta>div{padding:11px;border-left:4px solid var(--mint);background:#f0fdfa;font-size:13px}.table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}.table th{color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.06em}.table tr:last-child td{border-bottom:0}
+
+/* B: operation board. Verbs and safety gates are the primary model. */
+.b-board{border:1px solid #d8d3cb;background:#fdfcf9;box-shadow:var(--shadow)}.b-mast{display:flex;justify-content:space-between;gap:20px;padding:26px;background:#312e81;color:#fff}.b-mast h2{margin:0 0 4px;font-size:29px}.b-mast p{margin:0;color:#ddd6fe}.mode{display:flex;align-self:flex-start;gap:2px;padding:3px;border-radius:8px;background:#ffffff2e}.mode button{border:0;border-radius:6px;padding:7px 10px;background:transparent;color:#ede9fe;font-size:12px;font-weight:800}.mode button.selected{background:#fff;color:#312e81}.b-lanes{display:grid;grid-template-columns:1.05fr 1.15fr .9fr}.lane{min-height:640px;padding:20px;border-right:1px solid #ded9d1}.lane:last-child{border-right:0}.lane h3{padding-bottom:10px;border-bottom:3px solid;font-size:15px}.intent h3{border-color:#16a34a}.run h3{border-color:#7c3aed}.guard h3{border-color:#ea580c}.scenario{padding:12px;border-radius:8px;background:#fff;box-shadow:0 1px 0 #e5e7eb}.scenario+.scenario{margin-top:10px}.scenario p{margin-bottom:0;font-size:13px}.verb{margin:9px 0;padding:11px;border:1px solid #ddd6fe;border-radius:10px;background:#fff}.verb>div{display:flex;justify-content:space-between;gap:8px;align-items:center}.verb p{margin:5px 0 0;color:var(--muted);font-size:12px}.modepanel{display:none;margin-top:12px}.modepanel.visible{display:block}.signal{margin:10px 0;padding:10px;border-radius:8px;font-size:13px}.green{background:#dcfce7;color:#14532d}.orange{background:#ffedd5;color:#7c2d12}.red{background:#fee2e2;color:#7f1d1d}
+
+/* C: protocol workbench. Request/response schema is the primary model. */
+.c-workbench{overflow:hidden;border:1px solid #1e293b;border-radius:15px;background:#0b1220;color:#dbeafe;box-shadow:var(--shadow)}.c-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #243149;background:#101b2e}.dot{width:10px;height:10px;border-radius:50%;background:#fb7185}.dot.y{background:#fbbf24}.dot.g{background:#4ade80}.c-bar strong{margin-left:8px;font-family:ui-monospace,monospace}.c-grid{display:grid;grid-template-columns:250px minmax(0,1fr) 310px}.c-rail,.c-schema{padding:17px;background:#0e1728}.c-rail{border-right:1px solid #243149}.c-schema{border-left:1px solid #243149}.c-rail h3{color:#93c5fd;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.rpc{width:100%;margin:7px 0;padding:9px;border:1px solid #334155;border-radius:7px;background:#172236;color:#dbeafe;text-align:left;font:12px ui-monospace,monospace}.rpc.active{border-color:#67e8f9;background:#67e8f9;color:#04111f;font-weight:900}.c-console{min-width:0;padding:20px}.c-console-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.c-console h2{margin:0;color:#f8fafc;font:23px ui-monospace,monospace}textarea{width:100%;min-height:185px;margin:11px 0;padding:13px;border:1px solid #385071;border-radius:9px;background:#09101d;color:#e0f2fe;font:12px/1.55 ui-monospace,monospace;resize:vertical}.c-console pre{border:1px solid #1e3a5f;background:#07111f}.schema-line{padding:9px 0;border-bottom:1px solid #243149;font:12px/1.42 ui-monospace,monospace}.schema-line b{color:#67e8f9}.c-note{margin-top:12px;padding:10px;border-left:3px solid #fbbf24;background:#1f2937;color:#fde68a;font-size:12px}.footer{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-top:16px}
+@media(max-width:900px){.a-shell,.b-lanes,.c-grid{display:block}.a-nav{display:none}.lane,.c-rail,.c-schema{min-height:auto;border-right:0;border-bottom:1px solid #ded9d1}.c-rail,.c-schema{border-color:#243149}.a-grid,.footer{grid-template-columns:1fr}.commands,.meta{grid-template-columns:1fr}}@media(max-width:560px){.ribbon,.a-top,.b-mast{display:block}.head,.scope,.variant{padding-left:16px;padding-right:16px}.mode{margin-top:13px}.switcher span{min-width:145px}}
+</style>
+</head>
+<body>
+<div class="ribbon"><span>THROWAWAY · 不属于任何候选 CLI 方案</span>一页 3 variants · <code>?variant=A|B|C</code> 可直接切换</div>
+<header class="head"><p class="eyebrow">VOICE MEMOS CLI · V0.1 AGENT-FACING CONTRACT</p><h1>先选“机器如何理解命令”，再争论命令长什么样。</h1><p class="lede">三个结构刻意不同的候选契约。它们共享现实边界：读路径可评审；私有写入不能假装已解决；标题等内容默认不外泄。</p></header>
+<aside class="scope"><div><strong>评审范围：</strong>recording identifier、JSON/schema、help、错误、确认与 batch 语义。内存演示，不读取 Voice Memos、不落盘、不发起真实 mutation；仅审 CLI contract。</div></aside>
+<main>
+<section class="variant" data-variant="A" aria-label="Variant A 资源子命令式">
+<div class="a-shell">
+<nav class="a-nav" aria-label="资源命令树"><div class="brand">vmemo</div><ul><li>vmemo --help</li><li class="current">recordings</li><li>&nbsp;&nbsp;list</li><li>&nbsp;&nbsp;search</li><li>&nbsp;&nbsp;show &lt;recording-id&gt;</li><li>&nbsp;&nbsp;export &lt;recording-id&gt;</li><li>&nbsp;&nbsp;rename &lt;recording-id&gt;</li><li>&nbsp;&nbsp;delete &lt;recording-id&gt;</li><li>doctor</li></ul></nav>
+<div class="a-main">
+<div class="a-top"><div><span class="tag good">A · 资源 / 子命令式</span><h2 class="a-title">vmemo recordings …</h2><p class="annotation">把录音视作唯一资源；help 像可导航的 API 目录。最接近常见 CLI 与 REST 的心智模型。</p></div><span class="tag">候选：Unix 可读性优先</span></div>
+<div class="a-grid">
+<article class="card wide"><div class="copyline"><h3>root help · 机器与人共用入口</h3><button class="copy" data-copy="vmemo recordings &lt;command&gt; [options]">复制</button></div><pre>Usage: vmemo recordings &lt;command&gt; [options]
+
+Commands:  list  search  show  export  rename  delete
+Global:    --json  --quiet  --version  --help
+Contract:  stdout=结果；stderr=诊断；exit=稳定分类。recording-id 是不透明值。</pre></article>
+<article class="card"><div class="copyline"><h3>典型 command help</h3><button class="copy" data-copy="vmemo recordings export --help">复制</button></div><pre>Usage: vmemo recordings export &lt;recording-id&gt;
+  --to &lt;directory&gt;       required, user-selected destination
+  --format original      only supported v0.1 value
+  --json                 result envelope, no title by default
+  --dry-run              validate selection + destination; write nothing
+
+EXIT: 0 exported | 2 usage | 3 denied | 4 unsupported | 5 partial | 6 unavailable</pre></article>
+<article class="card"><h3>稳定 identifier + 默认隐私</h3><div class="meta"><div><b><code>rec_01J…</code></b><br>CLI 暴露的不透明 ID；adapter scope + schema version 绑定。绝不把路径、文件名、<code>Z_PK</code> 或标题当 selector。</div><div><b>默认输出</b><br><code>id</code>、date、duration、availability、backend。标题为 <code>&lt;redacted&gt;</code>；仅显式 <code>show --include title</code> 才返回。</div></div></article>
+<article class="card wide"><h3>全部资源命令：每个动词一条窄且可组合的语法</h3><div class="commands">
+<div class="command"><strong>list</strong><code>vmemo recordings list --limit 20 --json</code><p>游标分页；成功结果写 stdout。</p></div>
+<div class="command"><strong>search</strong><code>vmemo recordings search --created-after 2026-08-01 --json</code><p>仅 filter allowlist；不把 Voice Memos UI search 冒充 records API。</p></div>
+<div class="command"><strong>show</strong><code>vmemo recordings show rec_01J… --json</code><p>单条 metadata；<code>--include title</code> 必须显式。</p></div>
+<div class="command"><strong>export</strong><code>vmemo recordings export rec_01J… --to ./out --dry-run</code><p>验证来源、目标与快照稳定；复制才返回路径。</p></div>
+<div class="command"><strong>rename</strong><code>vmemo recordings rename rec_01J… --title "…" --confirm tok_… --yes</code><p><span class="tag no">v0.1 不支持</span> 可保留 help，执行一律拒绝；不能写私有 DB。</p></div>
+<div class="command"><strong>delete</strong><code>vmemo recordings delete --id rec_A --id rec_B --dry-run</code><p><span class="tag no">v0.1 不支持</span> 不删除文件；批量也不改变该边界。</p></div>
+</div></article>
+<article class="card"><h3>人类 vs <code>--json</code></h3><pre>$ vmemo recordings list
+ID          DATE        DURATION  TITLE
+rec_01J…    2026-08-21  04:32     &lt;redacted&gt;
+
+$ vmemo recordings list --json
+{"schema":"vmemo.recordings.v1","items":[{"id":"rec_01J…","title":null,"titleRedacted":true}]}</pre><p class="mini">A 采用 Unix：成功 body 在 stdout；失败诊断在 stderr。<code>--json</code> 不把 error 偷塞进成功数据流。</p></article>
+<article class="card"><h3>selection、dry-run 与 partial failure</h3><table class="table"><thead><tr><th>问题</th><th>A 的回答</th></tr></thead><tbody>
+<tr><td>单条 / 批量</td><td>单条 positional <code>&lt;recording-id&gt;</code>；批量重复 <code>--id</code> 或 <code>--from-json @file</code>，不可混用。</td></tr>
+<tr><td>破坏性预览</td><td><code>--dry-run</code> 返回拟执行项；真实 mutation 必须复用 <code>confirmationToken</code> 加 <code>--yes</code>。</td></tr>
+<tr><td>幂等 / 部分失败</td><td>读/export 可重试；逐项 <code>status</code>。任一失败 exit <code>5</code>，stdout 仍给完成/未完成清单。</td></tr>
+</tbody></table></article>
+<article class="card danger wide"><h3>明确拒绝，而不是“神奇地能写”</h3><pre>stderr: vmemo: VMEMO_UNSUPPORTED_BACKEND: rename/delete require a supported public backend
+hint: complete this change in Voice Memos.app; private database writes are never attempted
+exit: 4</pre><p class="mini">Shortcuts 只可作为用户手工 helper 的 <span class="tag experimental">experimental</span> 路径：不能按 <code>rec_…</code> 注入实体、不能承诺 JSON 回执或无人值守确认。</p></article>
+</div></div></div>
+<div class="note"><strong>一句话定位：</strong>适合把 CLI 当“资源 API”的团队：路径可预测、help 很好发现；代价是 confirmation 与 batch 规则散落在多个子命令中。</div>
+</section>
+
+<section class="variant" data-variant="B" aria-label="Variant B 扁平动词优先">
+<div class="b-board">
+<header class="b-mast"><div><span class="tag experimental">B · 扁平 verb-first</span><h2>先说要做什么，再给对象。</h2><p><code>vmemo list</code>、<code>vmemo export</code>、<code>vmemo delete</code> 在一张操作板上对齐输入、结果和安全门。</p></div><div class="mode" aria-label="输出模式示意"><button data-mode="human" class="selected">人类输出</button><button data-mode="json">--json envelope</button></div></header>
+<div class="b-lanes">
+<section class="lane intent"><h3>01 · 意图（root help）</h3><pre>Usage: vmemo &lt;verb&gt; [selection] [options]
+
+Read:    list | search | show | export
+Change:  rename | delete
+Inspect: doctor | help &lt;verb&gt;
+
+All verbs accept: --json --help</pre>
+<div class="scenario"><b>稳定 selector</b><p>每条记录有 <code>rec_…</code> opaque ID；可加 <code>--where @selection.json</code>。title/path 只能展示，永不做匹配键。</p></div>
+<div class="scenario"><b>选择先于动词</b><p><code>--id rec_A</code>、重复 <code>--id</code>、或 <code>--where</code> 三选一。零条 / 多条均明确返回，不猜。</p></div>
+<div class="scenario"><b>敏感字段默认</b><p>list/search 表格和 JSON 都省略 title；<code>show --reveal title</code> 只在本地终端输出，不进错误或诊断。</p></div></section>
+<section class="lane run"><h3>02 · 动词（典型 help 与示例）</h3>
+<div class="verb"><div><strong><code>list</code></strong><span class="tag good">read</span></div><p><code>vmemo list --limit 20</code> · <code>vmemo help list</code></p></div>
+<div class="verb"><div><strong><code>search</code></strong><span class="tag good">read</span></div><p><code>vmemo search --created-after 2026-08-01</code> · allowlist metadata filter。</p></div>
+<div class="verb"><div><strong><code>show</code></strong><span class="tag good">read</span></div><p><code>vmemo show --id rec_01J… --reveal title</code> · 单一 selection 必需。</p></div>
+<div class="verb"><div><strong><code>export</code></strong><span class="tag good">read + copy</span></div><p><code>vmemo export --id rec_01J… --to ./out --dry-run</code> · snapshot preflight。</p></div>
+<div class="verb"><div><strong><code>rename</code></strong><span class="tag no">unsupported</span></div><p><code>vmemo rename --id rec_01J… --title "…" --yes</code> · v0.1 只拒绝。</p></div>
+<div class="verb"><div><strong><code>delete</code></strong><span class="tag no">unsupported</span></div><p><code>vmemo delete --id rec_A --id rec_B --dry-run</code> · 不触碰私有文件或 DB。</p></div>
+<div class="modepanel visible" data-mode-panel="human"><pre>$ vmemo export --id rec_01J… --to ./out --dry-run
+PLAN  export rec_01J…  → ./out/recording.m4a
+OK    source available; destination writable; no files written</pre></div>
+<div class="modepanel" data-mode-panel="json"><pre>{"schema":"vmemo.result.v1","ok":true,"verb":"export","dryRun":true,
+ "selection":{"matched":1},"items":[{"id":"rec_01J…","status":"planned"}]}</pre></div>
+</section>
+<section class="lane guard"><h3>03 · 守卫（统一，不藏在动词里）</h3>
+<div class="signal green"><b>0 · success</b><br>所有 selected item 处于成功/已存在的幂等终态。</div>
+<div class="signal orange"><b>5 · partial</b><br>envelope 必有每项 <code>status/code</code>；没有“exit=0 就全成功”。</div>
+<div class="signal red"><b>3 / 4 / 6</b><br><code>PERMISSION_DENIED</code> / <code>UNSUPPORTED_BACKEND</code> / <code>SOURCE_UNAVAILABLE</code>。错误 envelope 写 stdout；stderr 只给人类单行摘要。</div>
+<div class="scenario"><b>确认是两步 protocol</b><p>mutation 的 <code>--dry-run</code> 返回 <code>confirmationToken</code>（选择、后端、过期时间绑定）。真实请求必须带 <code>--confirm tok_… --yes</code>。</p></div>
+<div class="scenario"><b>典型 command help</b><p><code>vmemo help delete</code><br><span class="mini">Requires: <code>--id</code>+ · <code>--dry-run</code> first · <code>--confirm</code> · <code>--yes</code><br>v0.1 response: <code>UNSUPPORTED_BACKEND</code>, exit 4.</span></p></div>
+<div class="card exp" style="margin-top:10px"><strong>Shortcuts ≠ backend</strong><span class="mini">仅 experimental、用户手工 helper；不可按 opaque ID 精确操作，不能把 UI/Automation 提示伪装成 CLI confirmation。</span></div>
+</section></div></div>
+<div class="note"><strong>一句话定位：</strong>适合 agent 以“动词 + selection + envelope”生成调用：所有动词共享 guardrails；代价是资源归属感更弱，命名空间扩张时可能拥挤。</div>
+</section>
+
+<section class="variant" data-variant="C" aria-label="Variant C JSON request-first">
+<div class="c-workbench">
+<div class="c-bar"><i class="dot"></i><i class="dot y"></i><i class="dot g"></i><strong>vmemo protocol workbench · stdin request / stdout response</strong><span class="tag" style="margin-left:auto">C · agent RPC / JSON request-first</span></div>
+<div class="c-grid">
+<aside class="c-rail"><h3>root help</h3><pre>Usage:
+  vmemo query  &lt; request.json
+  vmemo mutate &lt; request.json
+  vmemo help [method]
+
+stdout: one JSON response
+stderr: transport/runtime only
+exit: 0 protocol answered
+      2 invalid request
+      3 execution error</pre><h3 style="margin-top:20px">methods</h3>
+<button class="rpc active" data-rpc="recordings.list">recordings.list</button><button class="rpc" data-rpc="recordings.search">recordings.search</button><button class="rpc" data-rpc="recordings.show">recordings.show</button><button class="rpc" data-rpc="recordings.export">recordings.export</button><button class="rpc" data-rpc="recordings.rename">recordings.rename</button><button class="rpc" data-rpc="recordings.delete">recordings.delete</button><p class="mini" style="color:#94a3b8">按钮只替换内存示例 request；不会调用程序。</p></aside>
+<section class="c-console"><div class="c-console-head"><div><p class="eyebrow" style="color:#67e8f9">REQUEST</p><h2 id="rpc-title">recordings.list</h2></div><button class="copy" data-copy-target="rpc-request">复制 JSON</button></div>
+<textarea id="rpc-request" aria-label="JSON request 示例">{
+  "schema": "vmemo.request.v1",
+  "id": "req_01J…",
+  "method": "recordings.list",
+  "params": { "limit": 20, "cursor": null },
+  "privacy": { "include": [] }
+}</textarea>
+<div class="copyline"><h3 style="color:#93c5fd">RESPONSE · success / per-item states share one envelope</h3><span id="rpc-status" class="mini" style="color:#5eead4">本地示例</span></div>
+<pre id="rpc-response">{
+  "schema": "vmemo.response.v1",
+  "id": "req_01J…",
+  "ok": true,
+  "result": {
+    "items": [{"id":"rec_01J…","createdAt":"2026-08-21T…Z","durationMs":272000,"title":null,"titleRedacted":true}],
+    "nextCursor": "cur_01J…",
+    "backend": {"kind":"private-read-adapter","schemaVersion":1326}
+  },
+  "errors": []
+}</pre>
+<div class="c-note">人类仍可用：<code>vmemo help recordings.export</code> 输出 method schema、参数和 error codes；<code>vmemo query --pretty</code> 只改变空白，不改变 JSON。主契约始终是 request/response，不是表格。</div>
+</section>
+<aside class="c-schema"><h3>schema / 识别符</h3>
+<div class="schema-line"><b>recording.id</b><br><code>rec_…</code> opaque、adapter-scoped；不输出也不接受路径、标题、<code>Z_PK</code>。</div>
+<div class="schema-line"><b>selection</b><br><code>{"ids":[…]}</code> 或 <code>{"filter":…}</code>；必须 exactly one。单条也用同一形状。</div>
+<div class="schema-line"><b>privacy.include</b><br>默认 <code>[]</code>；只有 <code>["title"]</code> 才可在 result 中出现 title，永不放 error。</div>
+<div class="schema-line"><b>mutation protocol</b><br><code>dryRun:true</code> → <code>plan.confirmationToken</code> → <code>confirm:{token,yes:true}</code>。</div>
+<div class="schema-line"><b>errors[]</b><br><code>{scope,code,retryable,message}</code>；如 <code>PERMISSION_DENIED</code>、<code>UNSUPPORTED_BACKEND</code>、<code>SOURCE_UNAVAILABLE</code>。</div>
+<div class="schema-line"><b>batch</b><br><code>result.items[]</code> 始终逐项回报；部分失败是 <code>ok:false</code> + <code>PARTIAL_FAILURE</code>，exit 3。</div>
+<div class="card exp" style="margin-top:13px"><strong>写能力诚实状态</strong><span class="mini">rename/delete 可在 schema 占位以便 client 前向兼容，但 v0.1 必返 <code>UNSUPPORTED_BACKEND</code>。私有写入不做；Shortcuts 仅 experimental，不能满足此 RPC 的确定性。</span></div>
+</aside></div></div>
+<div class="footer"><article class="card"><h3>典型 method help + 全部语义</h3><pre>$ vmemo help recordings.export
+params.selection: {"ids":["rec_…"]} | {"filter":…}
+params.destination: user-selected directory
+params.dryRun: boolean
+success: result.items[].status = planned|exported|already_exists
+errors: each item gets code; permission/unsupported never falls back
+idempotency: request.id + destination policy; retry returns same terminal state when known
+
+$ vmemo query &lt; request.json  # list/search/show
+$ vmemo mutate &lt; request.json # export/rename/delete; v0.1 write methods reject</pre></article>
+<article class="card danger"><h3>错误 response（包括权限 / unsupported）</h3><pre>{"schema":"vmemo.response.v1","id":"req_…","ok":false,
+ "result":{"items":[{"id":"rec_A","status":"rejected","code":"UNSUPPORTED_BACKEND"}]},
+ "errors":[{"scope":"request","code":"UNSUPPORTED_BACKEND","retryable":false,
+ "message":"A supported public write backend is unavailable."}]}</pre><p class="mini">C 的成功与失败均写 stdout JSON；stderr 仅限无法解析输入、启动失败等 transport/runtime 诊断。</p></article></div>
+<div class="note"><strong>一句话定位：</strong>适合 agent-first 自动化：schema、batch、confirmation 与错误都只有一种形状；代价是人类要学 JSON，临时 CLI 使用不如 A/B 轻。</div>
+</section>
+</main>
+<nav class="switcher" aria-label="原型变体切换器"><button id="prev" aria-label="上一个变体">←</button><span id="switchlabel">A — 资源 / 子命令式</span><button id="next" aria-label="下一个变体">→</button></nav>
+<script>
+(function(){
+  var variants=[{key:"A",label:"资源 / 子命令式"},{key:"B",label:"扁平 verb-first"},{key:"C",label:"agent RPC / JSON request-first"}];
+  var lookup={};variants.forEach(function(v){lookup[v.key]=v});
+  function key(){var candidate=new URLSearchParams(window.location.search).get("variant");return lookup[candidate]?candidate:"A"}
+  function render(){var active=key();document.querySelectorAll(".variant").forEach(function(node){node.classList.toggle("active",node.dataset.variant===active)});document.getElementById("switchlabel").textContent=active+" — "+lookup[active].label;document.title="THROWAWAY · "+active+" · vmemo CLI 契约评审"}
+  function change(direction){var index=variants.map(function(v){return v.key}).indexOf(key());var next=variants[(index+direction+variants.length)%variants.length].key;var url=new URL(window.location.href);url.searchParams.set("variant",next);window.history.replaceState({},"",url);render()}
+  document.getElementById("prev").addEventListener("click",function(){change(-1)});document.getElementById("next").addEventListener("click",function(){change(1)});
+  window.addEventListener("keydown",function(event){var target=event.target;if(target instanceof HTMLInputElement||target instanceof HTMLTextAreaElement||target.isContentEditable)return;if(event.key==="ArrowLeft")change(-1);if(event.key==="ArrowRight")change(1)});
+  document.querySelectorAll("[data-copy],[data-copy-target]").forEach(function(button){button.addEventListener("click",function(){var value=button.dataset.copyTarget?document.getElementById(button.dataset.copyTarget).value:button.dataset.copy;var original=button.textContent;function done(message){button.textContent=message;window.setTimeout(function(){button.textContent=original},1300)}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(value).then(function(){done("已复制")},function(){done("请选择并复制")})}else{done("请选择并复制")}})});
+  document.querySelectorAll("[data-mode]").forEach(function(button){button.addEventListener("click",function(){document.querySelectorAll("[data-mode]").forEach(function(node){node.classList.toggle("selected",node===button)});document.querySelectorAll("[data-mode-panel]").forEach(function(node){node.classList.toggle("visible",node.dataset.modePanel===button.dataset.mode)})})});
+  var examples={
+    "recordings.list":{request:{method:"recordings.list",params:{limit:20,cursor:null},privacy:{include:[]}},response:{ok:true,result:{items:[{id:"rec_01J…",createdAt:"2026-08-21T…Z",durationMs:272000,title:null,titleRedacted:true}],nextCursor:"cur_01J…"},errors:[]}},
+    "recordings.search":{request:{method:"recordings.search",params:{filter:{createdAfter:"2026-08-01T00:00:00Z"},limit:20},privacy:{include:[]}},response:{ok:true,result:{items:[{id:"rec_01J…",title:null,titleRedacted:true}],nextCursor:null},errors:[]}},
+    "recordings.show":{request:{method:"recordings.show",params:{selection:{ids:["rec_01J…"]}},privacy:{include:["title"]}},response:{ok:true,result:{item:{id:"rec_01J…",title:"仅在显式 reveal 时返回",titleRedacted:false}},errors:[]}},
+    "recordings.export":{request:{method:"recordings.export",params:{selection:{ids:["rec_01J…"]},destination:"./out",dryRun:true}},response:{ok:true,result:{plan:{confirmationToken:"tok_01J…",expiresAt:"2026-08-28T…Z"},items:[{id:"rec_01J…",status:"planned"}]},errors:[]}},
+    "recordings.rename":{request:{method:"recordings.rename",params:{selection:{ids:["rec_01J…"]},title:"new title",dryRun:true}},response:{ok:false,result:{items:[{id:"rec_01J…",status:"rejected",code:"UNSUPPORTED_BACKEND"}]},errors:[{scope:"request",code:"UNSUPPORTED_BACKEND",retryable:false,message:"A supported public write backend is unavailable."}]}},
+    "recordings.delete":{request:{method:"recordings.delete",params:{selection:{ids:["rec_A","rec_B"]},dryRun:true}},response:{ok:false,result:{items:[{id:"rec_A",status:"rejected",code:"UNSUPPORTED_BACKEND"},{id:"rec_B",status:"rejected",code:"UNSUPPORTED_BACKEND"}]},errors:[{scope:"request",code:"UNSUPPORTED_BACKEND",retryable:false,message:"Private file and database writes are never attempted."}]}}
+  };
+  var request=document.getElementById("rpc-request"),response=document.getElementById("rpc-response");
+  document.querySelectorAll(".rpc").forEach(function(button){button.addEventListener("click",function(){var method=button.dataset.rpc,example=examples[method];document.querySelectorAll(".rpc").forEach(function(node){node.classList.toggle("active",node===button)});document.getElementById("rpc-title").textContent=method;request.value=JSON.stringify(Object.assign({schema:"vmemo.request.v1",id:"req_01J…"},example.request),null,2);response.textContent=JSON.stringify(Object.assign({schema:"vmemo.response.v1",id:"req_01J…"},example.response),null,2);document.getElementById("rpc-status").textContent="已切换为 "+method+" 示例"})});
+  render();
+}());
+</script>
+</body>
+</html>
