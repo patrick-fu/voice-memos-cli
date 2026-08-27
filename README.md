@@ -15,5 +15,6 @@ Current research found no supported direct Voice Memos data API or transcript wr
 ## Research
 
 - [Voice Memos data access boundaries](docs/research/voice-memos-data-access.md)
+- [Private API and community implementation survey](docs/research/private-api-community-survey.md)
 - [Transcript write-back feasibility](docs/research/voice-memos-transcript-writeback.md)
 - [Shortcuts bridge feasibility](docs/research/voice-memos-shortcuts-bridge.md)
