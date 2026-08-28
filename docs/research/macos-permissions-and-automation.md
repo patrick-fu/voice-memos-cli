@@ -11,8 +11,8 @@
 
 | 能力 | 决策 | 条件 |
 | --- | --- | --- |
-| `list/search/show/export` | **Go** | 推荐用户授予 Full Disk Access（FDA）作为稳定的宽授权；schema、路径、SQLite snapshot 与资产状态全部通过 preflight。FDA 不是已证明的最小或唯一可行授权。 |
-| `rename/delete` | **Go（允许无人值守）** | 唯一写后端是原生 `AXUIElement`；无需人在电脑前，也不把锁屏、SSH 或后台标签本身当作拒绝条件。实际 UI 必须可达且可验证，并满足 Accessibility、token、显式确认和逐条 pre/post verification。 |
+| `list/search/show/export` | **Blocked** | schema、state predicate 与资产语义尚未完成 disposable 验证；production read 保持 fail closed。FDA 不是已证明的最小或唯一可行授权。 |
+| `rename/delete` | **Blocked（production）** | Issue #26 仅证明 disposable UI mutation 的可行性；production 仍需 Accessibility、opaque-ID/UI-tuple 映射、token、显式确认和逐条 pre/post verification。 |
 | 打开 Voice Memos、人工操作 | **Go（辅助路径）** | 可用于用户自行完成操作，但不是 `rename/delete` 命令的替代后端。 |
 | System Events/JXA UI scripting | **No-Go（默认实现）** | 它增加 Apple Events/Automation 面；尚无证据证明它能免除 Accessibility。仅可作为单独、后续实验证明的兼容后备。 |
 | 直接改 Voice Memos SQLite、资源或 CloudKit mirror | **No-Go** | FDA 只解决文件可读性，不提供 Core Data、`voicememod`、CloudKit 或 Recently Deleted 的一致性契约。 |
@@ -22,7 +22,7 @@
 
 `list`、`search`、`show`、`export`、`rename` 和 `delete` 都是 v0.1 的正常命令；权限、preflight 或确认不满足时返回明确错误，而不是把命令隐藏或改名。
 
-本地 Agent 可以无人值守执行 token-confirmed mutation。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。任何一步不可验证才 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
+未来在 token-confirmed mutation 通过完整验证后，才考虑无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read/mutation 保持 blocked；v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
 
 ## 权限矩阵
 
@@ -59,6 +59,12 @@
 - `AXIsProcessTrustedWithOptions` 返回**当前进程**是否为受信任的 Accessibility client；`kAXTrustedCheckOptionPrompt: true` 只会异步通知用户，不能把 `false` 变为同步成功。[Apple API 文档](https://developer.apple.com/documentation/applicationservices/1459186-axisprocesstrustedwithoptions)
 - 本机 Xcode 26.2 SDK 的 `AXUIElement.h` 对该函数的声明与上述一致；同一 header 说明 `AXUIElementCreateApplication(pid)` 只创建目标 app 的顶层 accessibility object，且 messaging failure 可返回 `kAXErrorCannotComplete`。这没有给 UI tree、role、title 或 action 一个稳定合同。
 - Apple 支持文档说明第三方 app 请求通过 Accessibility 控制 Mac 时，用户需在 Privacy & Security 中明确允许或拒绝。[Allow accessibility apps to access your Mac](https://support.apple.com/en-euro/guide/mac-help/-mh43185/mac)
+
+### Issue #26 disposable AX evidence（脱敏）
+
+在 build 1380 的两条 disposable 上，AX row 与选中的 title field 均无可用 AXIdentifier 或 opaque DB ID。row 暴露 title/time description、duration、selection 与 native custom actions；选中的 title field 可 set。对 title field 调用 `AXSetValue` 后，选择另一条唯一匹配的 disposable row 可以提交。两条样本均通过 fresh owner-only backup integrity 检查，且 backup 期间 source metadata 稳定。改名后 UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` exact equal；`ZCUSTOMLABEL` 不等于新的 UI title。证据不记录真实 title、ID、path、时间或大小。
+
+**定位约束：** 不得假设 `AXIdentifier == ID`。实现必须用 opaque DB ID + 唯一、validated UI tuple 建立 fail-closed 映射；同 tuple 匹配多条即 ambiguous。delete、restore 与 state predicate 尚未验证，production read/mutation 仍 blocked。
 
 ### 进程身份：必须保守处理
 
@@ -102,7 +108,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 
 ## `rename/delete` 执行协议（v0.1 contract）
 
-`rename` 和 `delete` 是正常命令；其**唯一**写后端为原生 `AXUIElement`。它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 作为 silent fallback。
+`rename` 和 `delete` 的唯一候选写后端是原生 `AXUIElement`；Issue #26 的 disposable 结果不构成 production 授权。它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 作为 silent fallback；在 state predicate、opaque-ID/UI-tuple 映射和完整 pre/post 验证完成前保持 blocked。
 
 1. 命令先对每个请求的 Recording 建立一次性、短时有效的 opaque target token；token 绑定本次动作、目标的 fresh UI verification 和环境指纹，不能从 Title、列表 index 或旧 UI element 推导。
 2. mutation 必须提供该 token 和显式确认。交互模式可要求用户输入确认；`--json`/非交互模式必须显式传入确认参数，且**不得**调用 `AXIsProcessTrustedWithOptions` 的 prompt option、显示确认窗口或任何 TCC 授权 UI。权限未满足时返回机器可读拒绝，留给用户在系统设置完成授权后重试。
@@ -110,7 +116,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 4. batch 接受批量输入，但严格串行执行；每条都独立消费 token、完成 fresh pre/post verification。任一歧义、焦点漂移、权限变化、超时或 post-verification 失败立即停止后续项目，并以机器可读 partial result（至少含 `status: "partial"`、`completed`、`failed`、`notAttempted` 和稳定错误码）返回；不得并行或继续猜测。
 5. `delete` 只按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted。Permanent Delete、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令不得调用或模拟这些 UI action。
 
-**已决定：**满足上述 token、显式确认、可验证 UI 状态和串行验证条件后，允许非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
+**后续条件：**满足上述 token、显式确认、可验证 UI 状态和串行验证条件后，才可评估非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。当前 production mutation 仍 blocked。
 
 ## Doctor、拒绝处理与失败关闭
 

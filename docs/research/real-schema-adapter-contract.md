@@ -4,9 +4,9 @@
 
 ## 结论
 
-**目前不能实现会返回 “Active Recording” 或 Title 的真实 read adapter。** macOS 26 有足够的 Apple bundle 元数据，能写出一个 fail-closed 的 *schema recognizer*；不足以安全决定下列任一用户可见语义：
+**目前不能实现会返回 “Active Recording” 的 production 真实 read adapter；production read/mutation 仍 blocked。** macOS 26 有足够的 Apple bundle 元数据，能写出一个 fail-closed 的 *schema recognizer*；Title 仅在下方当前 build manifest 条件满足时具备候选映射，仍不能据此放行 production 读取。尚不足以安全决定下列语义：
 
-- 哪个字符串字段是 Title，或三个候选字段不一致时的优先级；
+- 当前 build manifest 之外的 Title 语义，或 sorting/encrypted 两字段不一致时的 fallback；
 - 哪些 `ZCLOUDRECORDING` 行处于正常资料库、Recently Deleted、云端占位或已驱逐状态；
 - `ZPATH` 是否始终是相对路径、对应可导出的本地资产，或 `.qta` 的 export 语义。
 
@@ -94,7 +94,7 @@ _ = c'
 
 **Physical schema observation（single build/store）：** `ZCLOUDRECORDING` 的 exact canonical schema（按 `cid` 排序的 `cid|name|type|notnull|default|pk`，共 29 列）以 SHA-256 `9f3c4d7a46bb8ef37028fefdaf30ef1da7d0e93b9494877e3871fdae40a9a511` 固化；声明类型观察到 `INTEGER`、`FLOAT`、`TIMESTAMP`、`VARCHAR`、`BLOB`。这只是 build 1380 的单一 store fingerprint，不是 Apple contract；不得据此推导 affinity、epoch、bit 意义或跨版本兼容性，也不得把未验证的其他表声明写入 gate。
 
-**Disposable samples（两条、专门创建、脱敏）：** UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` 一致；`ZCUSTOMLABEL` 为 UTC timestamp；`ZPATH` 为相对 `.m4a`；`duration`/`localDuration` 与 UI 秒数一致；`evictionDate` 为 `NULL`、`flags=516`、`folder` 为 `NULL`。未记录真实 title/ID/path。两条样本不足以定义 title fallback，或 active/deleted/placeholder predicate。
+**Issue #26 disposable evidence（两条、专门创建、脱敏）：** 在 build 1380 的两条 disposable 上，AX row 与选中的 title field 都没有可用的 AXIdentifier 或可回溯的 opaque DB ID。row 暴露 title/time description、duration、selection 与 native custom actions；选中的 title field 可 set。对 title field 调用 `AXSetValue` 后，再选择另一条唯一匹配的 disposable row 可以提交。两条样本均通过 fresh owner-only backup integrity 检查，且 backup 期间 source metadata 稳定。改名后的 UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` **逐字相等**；`ZCUSTOMLABEL` 不等于新的 UI title。全文不记录真实 title、ID、path、时间或大小。
 
 其中一条样本另做 owner-only `/tmp` copy 验收：source `lstat` 为 regular、非 symlink；destination 预先不存在；复制前后 source metadata 不变；source/destination SHA-256 相等；`file` 识别为 ISO Media Apple iTunes ALAC/AAC-LC `.M4A`（约 3 KB）。不记录文件名或内容 hash；该结果只证明本次样本的安全复制行为，不构成通用 asset/type 合同。
 
@@ -156,11 +156,11 @@ for p in m.entitiesByName["CloudRecording"]!.properties.sorted(by: { $0.name < $
 
 ## Issue #21 的语义问题
 
-### Opaque ID
+### Opaque ID 与 AX locator
 
 **Apple metadata（观察）：** `CloudRecording.uniqueID` 是 optional String；既有结构记录观察到 `ZUNIQUEID`。这是唯一可接受的 ID 候选。
 
-**Inference：** 仅在 single snapshot 中 `ZUNIQUEID` 为 nonempty valid UTF-8、二进制不重复，且对应行已通过 future active-state validation 时，才构造 `RecordingID(value:)`。不要求 UUID 格式（Apple model 只说 String）；不得回退 `Z_PK`、`Z_ENT`、`Z_OPT`、title 或 path。重复/NULL/空值是 `unsupported_schema` 或逐行安全失败，不得合并。
+**Inference：** 仅在 single snapshot 中 `ZUNIQUEID` 为 nonempty valid UTF-8、二进制不重复，且对应行已通过 future active-state validation 时，才构造 `RecordingID(value:)`。不要求 UUID 格式（Apple model 只说 String）；不得回退 `Z_PK`、`Z_ENT`、`Z_OPT`、title 或 path。重复/NULL/空值是 `unsupported_schema` 或逐行安全失败，不得合并。Issue #26 进一步证明 AXIdentifier 不是 DB ID 的可用替代：AX locator 必须以 opaque DB ID 与唯一、经验证的 UI tuple 建立映射；不得假设 `AXIdentifier == ID`。tuple 若匹配多条，立即按 ambiguous fail closed。
 
 ### Title precedence
 
@@ -173,7 +173,9 @@ for p in m.entitiesByName["CloudRecording"]!.properties.sorted(by: { $0.name < $
 
 **非证据/待核验声明：** [cathrynlavery/voice-memo-organizer `SKILL.md`, `e0deb89`](https://github.com/cathrynlavery/voice-memo-organizer/blob/e0deb8949801f1684150b8647773a4f92d418834/SKILL.md#L177-L205) 声称在 macOS 26.5 观察到 `ZCUSTOMLABELFORSORTING` 是 UI title。它不是执行查询的 source code，不能与上述实现并列，更不支持任何 precedence；最多提示 disposable validation 要覆盖该字段。
 
-**结论：** 没有可执行的 Apple 合同或一致 community 行为；Title precedence **unsupported**。当前 adapter 不得投影、搜索、输出或记录其中任一值，也不得以字符串 `Untitled` 代替真实 Title。
+**Issue #26 observed fact：** 对两条 disposable，改名后 UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` 均 exact equal，且两字段均为 nonempty valid UTF-8；`ZCUSTOMLABEL` 不等于 UI title。
+
+**结论（当前 build manifest）：** display title 仅可要求 `ZCUSTOMLABELFORSORTING` 与 `ZENCRYPTEDTITLE` 均 nonempty、valid UTF-8，并且二者 exact equal；满足时使用该共同值。不得定义更宽 fallback；任一 mismatch、NULL、空值或无效 UTF-8 一律 fail closed。该结论只适用于当前 build manifest，不能外推其他版本。
 
 ### Active / Recently Deleted / cloud placeholder / evicted
 
@@ -183,7 +185,7 @@ Apple 用户指南确认 Voice Memos 的删除先进入 Recently Deleted，且�
 
 **Community code behavior：** 公开的 [harryf implementation](https://github.com/harryf/voice-memos/blob/7e38eda5e50d537e933dd67a4a3aeec473a90444/Sources/voice-memos/Database.swift#L64-L107) 动态取得列后按 `ZDATE` 排序；[polarity implementation](https://github.com/polarity-dev/macos-voice-memos-export/blob/1f6e70ffe7048a8d4fa12a8696626a1abc2367c1/Sources/Broker/VoiceMemosStore.swift#L9-L39) 要求 `ZPATH`。均没有可靠的 deleted/Recently Deleted predicate。未找到固定源码证明任何 `ZFLAGS` bit、`ZEVICTIONDATE IS NULL`、`ZFOLDER IS NULL`、`ZPATH IS NOT NULL` 或 duration 阈值意味着 Active。
 
-**结论：** 这些 predicate 全部禁止：
+**结论：** 这些 predicate 全部禁止；delete、restore 及 active/Recently Deleted/cloud placeholder/evicted 的 state predicate 尚未验证，production read/mutation 仍 blocked：
 
 ```sql
 ZFLAGS = 0
@@ -210,7 +212,7 @@ ZDURATION >= <threshold>
 | 验证问题 | 最小 matrix | 升格条件 |
 | --- | --- | --- |
 | macOS 26 exact DDL/metadata | build 1380 的 disposable store；仅 schema/metadata，不保存 rows | 固定 `Z_METADATA` decoding、table/column declaration/affinity、model hash 与 column fingerprint 一致；届时才可在新版本 manifest 中把经复现的 physical fingerprint 提升为 gate。 |
-| Title precedence | App 创建/改名若干无敏感 sample，使三 title candidate 覆盖 NULL/不同值；比较 App UI | 对每个组合的 UI Title 有一致 mapping，且跨重启 snapshot 不漂移；才可定义 fallback。 |
+| Title precedence | App 创建/改名若干无敏感 sample，使三 title candidate 覆盖 NULL/不同值；比较 App UI | 当前 build 仅接受 sorting/encrypted 均 nonempty valid UTF-8 且 exact equal；mismatch/null fail closed，不定义更宽 fallback。 |
 | Active / Recently Deleted | 分别创建 active、通过 App 移到 Recently Deleted、恢复；不 permanent delete | 每个状态有稳定、可解释、跨样本一致的 *read-only* predicate；否则 list 继续 blocked。 |
 | local / evicted / iCloud placeholder | 本地 sample、离线/未下载 sample、eviction-related state（只用官方 UI/系统流程） | 资产可用性可由 path + filesystem post-check 区分；禁止仅依据 DB column 或文件大小。 |
 | `.m4a` / `.qta` export | 两种可出现的 sample、每种 asset availability | 每个被支持类型都有 FD-copy + AVFoundation/open verification；不支持者返回 `asset_unavailable` 或 `unsupported_asset_type`。 |
@@ -225,7 +227,7 @@ ZDURATION >= <threshold>
 3. 为 recognizer 写 synthetic metadata contract tests：错 build、错 `.mom` hash、缺/多 manifest key、任一 hash 的任一 byte 改动（即使 `isConfiguration(_:compatibleWithStoreMetadata:)` 返回 true）、值非 32 bytes、metadata 不可读取、manifest version identifiers 非 `[""]`、仅 `schema_version=1326`、未知 OS，全部因 manifest mismatch fail closed。`isConfiguration` 返回 false 仅记录 diagnostic，不作为失败条件。另写不进入当前 gate 的 future physical-fingerprint tests：它们只在 disposable matrix 固定 exact DDL/column manifest 后，才可变成 row-reader 的升级测试；真实 DB/asset 不进入 tests。
 4. 完成上节所有 macOS 26 matrix 后，才把验证结果（固定 build/model/DDL/state/title/asset manifest）加入 allowlist，并以新的 issue 决定是否实现 row reader。macOS 15 单独走相同流程。
 
-**可进入实现的范围：** recognizer、错误码、synthetic contract tests。**不可进入实现的范围：** real list/search/show/export、title fallback、active/deleted filtering、placeholder detection、资产复制。证据强度足以实现前者，不足以安全实现后者。
+**可进入实现的范围：** recognizer、错误码、synthetic contract tests。**不可进入实现的范围：** production real list/search/show/export、production AX read/mutation、title fallback、active/deleted filtering、placeholder detection、资产复制。证据强度足以实现前者，不足以安全实现后者。
 
 ## 参考来源
 
