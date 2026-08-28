@@ -3,10 +3,15 @@ import Foundation
 import SQLite3
 
 protocol SnapshotPort: Sendable {
-    func makeSnapshot(source: URL, destinationRoot: URL) throws -> SnapshotHandle
+    func makeSnapshot(source: URL, destinationRoot: URL) throws -> any SnapshotLease
 }
 
-struct SnapshotHandle: Sendable {
+protocol SnapshotLease: Sendable {
+    var url: URL { get }
+    func cleanup() throws
+}
+
+struct SnapshotHandle: SnapshotLease {
     let url: URL
 
     fileprivate let directory: SnapshotDirectory
@@ -31,7 +36,7 @@ struct SQLiteSnapshotAdapter: SnapshotPort {
     private static let maxSteps = 10_000
     private static let deadline: Duration = .seconds(2)
 
-    func makeSnapshot(source: URL, destinationRoot: URL) throws -> SnapshotHandle {
+    func makeSnapshot(source: URL, destinationRoot: URL) throws -> any SnapshotLease {
         guard isValidatedRegularFile(source), let sourceURI = readOnlyURI(for: source) else {
             throw SQLiteSnapshotError.invalidSource
         }

@@ -80,6 +80,8 @@ struct CommandRunner: Sendable {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
         } catch let error as SchemaAdapterError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
+        } catch let error as SnapshottingRecordingReadError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         } catch let error as RecordingAssetError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         } catch {
@@ -192,6 +194,9 @@ struct CommandRunner: Sendable {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
         }
         if let error = error as? SchemaAdapterError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
+        }
+        if let error = error as? SnapshottingRecordingReadError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         }
         if let error = error as? RecordingAssetError {
