@@ -5,6 +5,19 @@ struct VMemo: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "vmemo",
         abstract: "Safely inspect and manage Voice Memos recordings.",
+        usage: "vmemo <subcommand>",
+        discussion: """
+        Agent-facing CLI with a stable, fail-closed contract.
+
+        Output: human reports go to stdout; diagnostics go to stderr. Add --json for the version 1 JSON envelope (version: 1, status, and data or error).
+        Exit codes: 0 success, 2 usage error, 3 operational/output error, 4 safety or adapter block, 5 partial/incomplete result.
+        Recording IDs are opaque and must be passed exactly as returned. Mutations fail closed when safety or adapter checks cannot be satisfied.
+        delete moves a recording to Recently Deleted; it does not permanently erase it.
+
+        Examples:
+          vmemo list --json
+          vmemo show --id opaque-recording-id --json
+        """,
         subcommands: [List.self, Search.self, Show.self, Export.self, Rename.self, Delete.self, Doctor.self]
     )
 }
@@ -43,14 +56,22 @@ private extension RoutedCommand {
 }
 
 private struct List: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "List recordings.")
+    static let configuration = CommandConfiguration(
+        abstract: "List recordings.",
+        usage: "vmemo list [--json]",
+        discussion: "List recordings. Example: vmemo list --json"
+    )
     @OptionGroup var output: OutputOptions
 
     func request() -> CommandRequest { .list }
 }
 
 private struct Search: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Search recordings.")
+    static let configuration = CommandConfiguration(
+        abstract: "Search recordings.",
+        usage: "vmemo search --query <text> [--json]",
+        discussion: "Search recording titles. Example: vmemo search --query meeting --json"
+    )
     @Option(name: .long, help: "Search text.") var query: String
     @OptionGroup var output: OutputOptions
 
@@ -58,7 +79,11 @@ private struct Search: RoutedCommand {
 }
 
 private struct Show: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Show one recording.")
+    static let configuration = CommandConfiguration(
+        abstract: "Show one recording.",
+        usage: "vmemo show --id <opaque-recording-id> [--json]",
+        discussion: "Use the opaque ID returned by list or search. Example: vmemo show --id opaque-recording-id --json"
+    )
     @Option(name: .long, help: "Opaque recording identifier.") var id: String
     @OptionGroup var output: OutputOptions
 
@@ -66,18 +91,26 @@ private struct Show: RoutedCommand {
 }
 
 private struct Export: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Export one recording.")
-    @Option(name: .long, help: "Opaque recording identifier.") var id: String
-    @Option(name: .long, help: "Destination owned by the caller.") var outputPath: String
+    static let configuration = CommandConfiguration(
+        abstract: "Export one recording.",
+        usage: "vmemo export --id <opaque-recording-id> --output-path <destination> [--json]",
+        discussion: "Destination must not already exist; the source recording is never modified. Example: vmemo export --id opaque-recording-id --output-path ./recording.m4a --json"
+    )
+    @Option(name: .long, help: "Opaque recording identifier (required).") var id: String
+    @Option(name: .long, help: "Destination path; must not already exist (required).") var outputPath: String
     @OptionGroup var output: OutputOptions
 
     func request() -> CommandRequest { .export(id: RecordingID(value: id), destination: outputPath) }
 }
 
 private struct Rename: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Rename one recording.")
-    @Option(name: .long, help: "Opaque recording identifier.") var id: String
-    @Option(name: .long, help: "New user-visible title.") var title: String
+    static let configuration = CommandConfiguration(
+        abstract: "Rename one recording.",
+        usage: "vmemo rename --id <opaque-recording-id> --title <new-title> (--dry-run | --token <token> --confirm) [--json]",
+        discussion: "Two calls are required: first run --dry-run to receive a short-lived token, then rerun with the same payload and --token TOKEN --confirm. Any payload change invalidates the token. Example: vmemo rename --id opaque-recording-id --title \"New title\" --dry-run --json"
+    )
+    @Option(name: .long, help: "Opaque recording identifier (required).") var id: String
+    @Option(name: .long, help: "New user-visible title (required).") var title: String
     @OptionGroup var mutation: MutationOptions
     @OptionGroup var output: OutputOptions
 
@@ -92,8 +125,12 @@ private struct Rename: RoutedCommand {
 }
 
 private struct Delete: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Move one recording to Recently Deleted.")
-    @Option(name: .long, help: "Opaque recording identifier.") var id: String
+    static let configuration = CommandConfiguration(
+        abstract: "Move one recording to Recently Deleted.",
+        usage: "vmemo delete --id <opaque-recording-id> (--dry-run | --token <token> --confirm) [--json]",
+        discussion: "delete moves the recording to Recently Deleted. Two calls are required: first run --dry-run to receive a short-lived token, then rerun with the same payload and --token TOKEN --confirm. Any payload change invalidates the token. Example: vmemo delete --id opaque-recording-id --dry-run --json"
+    )
+    @Option(name: .long, help: "Opaque recording identifier (required).") var id: String
     @OptionGroup var mutation: MutationOptions
     @OptionGroup var output: OutputOptions
 
@@ -108,8 +145,12 @@ private struct Delete: RoutedCommand {
 }
 
 private struct Doctor: RoutedCommand {
-    static let configuration = CommandConfiguration(abstract: "Check adapter availability and compatibility.")
-    @Flag(name: .long, help: "Also read current Accessibility trust without prompting.") var ui = false
+    static let configuration = CommandConfiguration(
+        abstract: "Check adapter availability and compatibility.",
+        usage: "vmemo doctor [--ui] [--json]",
+        discussion: "Ordinary mode does not check Accessibility. Add --ui to read current Accessibility trust; it is read-only and never prompts. Example: vmemo doctor --ui --json"
+    )
+    @Flag(name: .long, help: "Read Accessibility trust without prompting (read-only).") var ui = false
     @OptionGroup var output: OutputOptions
 
     func request() -> CommandRequest { .doctor(includeUI: ui) }

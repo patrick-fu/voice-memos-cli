@@ -13,6 +13,47 @@ final class VMemoCLITests: XCTestCase {
         }
     }
 
+    func testHelpIsSelfContainedForAgents() throws {
+        let root = try runVMemo("--help")
+        let rootHelp = normalizedHelp(root.stdout)
+        XCTAssertTrue(rootHelp.contains("Output: human reports go to stdout; diagnostics go to stderr."))
+        XCTAssertTrue(rootHelp.contains("version 1 JSON envelope"))
+        XCTAssertTrue(rootHelp.contains("Exit codes: 0 success, 2 usage error, 3 operational/output error, 4 safety or adapter block, 5 partial/incomplete result."))
+        XCTAssertTrue(rootHelp.contains("Recording IDs are opaque"))
+        XCTAssertTrue(rootHelp.contains("delete moves a recording to Recently Deleted"))
+
+        let helpCases: [(String, [String])] = [
+            ("rename", ["USAGE: vmemo rename", "--dry-run", "--token <token> --confirm", "payload change invalidates the token", "Example: vmemo rename"]),
+            ("delete", ["USAGE: vmemo delete", "Recently Deleted", "--dry-run", "--token <token> --confirm", "payload change invalidates the token", "Example: vmemo delete"]),
+            ("export", ["USAGE: vmemo export", "must not already exist", "source recording is never modified", "Example: vmemo export"]),
+            ("doctor", ["USAGE: vmemo doctor", "does not check Accessibility", "--ui", "never prompts", "Example: vmemo doctor"]),
+        ]
+        for (command, sections) in helpCases {
+            let result = try runVMemo(command, "--help")
+            XCTAssertEqual(result.status, 0, command)
+            let help = normalizedHelp(result.stdout)
+            for section in sections {
+                XCTAssertTrue(help.contains(section), "missing \(section) in \(command) help")
+            }
+        }
+    }
+
+    func testHelpExamplesReachAdapterLayerInsteadOfUsageErrors() throws {
+        let examples: [[String]] = [
+            ["list", "--json"],
+            ["search", "--query", "meeting", "--json"],
+            ["show", "--id", "opaque-recording-id", "--json"],
+            ["export", "--id", "opaque-recording-id", "--output-path", "/tmp/vmemo-example.m4a", "--json"],
+            ["rename", "--id", "opaque-recording-id", "--title", "New title", "--dry-run", "--json"],
+            ["delete", "--id", "opaque-recording-id", "--dry-run", "--json"],
+            ["doctor", "--ui", "--json"],
+        ]
+        for arguments in examples {
+            let result = try runVMemo(arguments)
+            XCTAssertNotEqual(result.status, 2, "example parsed as usage error: \(arguments.joined(separator: " "))")
+        }
+    }
+
     func testListJSONReportsVersionedSafetyEnvelopeWhenAdapterIsUnconfigured() throws {
         let result = try runVMemo("list", "--json")
 
@@ -251,6 +292,10 @@ final class VMemoCLITests: XCTestCase {
     }
 
     private func runVMemo(_ arguments: String...) throws -> ProcessResult {
+        try runVMemo(Array(arguments))
+    }
+
+    private func runVMemo(_ arguments: [String]) throws -> ProcessResult {
         let binaryDirectory = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
         let process = Process()
         let stdout = Pipe()
@@ -270,6 +315,12 @@ final class VMemoCLITests: XCTestCase {
 
     private func decodeJSON(_ text: String) throws -> [String: Any] {
         try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+    }
+
+    private func normalizedHelp(_ text: String) -> String {
+        text.replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
     }
 
     private func doctorReport(from result: ProcessResult) throws -> (status: String, checks: [String]) {
