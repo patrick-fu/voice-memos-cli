@@ -102,7 +102,7 @@ protocol RecordingWritePort: Sendable {
     func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult
 }
 
-enum MutationOperation: Sendable {
+enum MutationOperation: Sendable, Equatable {
     case rename(title: String)
     case moveToRecentlyDeleted
 
@@ -121,13 +121,19 @@ enum MutationOperation: Sendable {
     }
 }
 
-struct MutationRequest: Sendable {
+struct MutationRequest: Sendable, Equatable {
     let id: RecordingID
     let operation: MutationOperation
 }
 
 struct MutationAuthorization: Sendable {
     let token: String
+    let confirmed: Bool
+
+    init(token: String, confirmed: Bool = true) {
+        self.token = token
+        self.confirmed = confirmed
+    }
 }
 
 struct MutationPlan: Sendable, Codable {

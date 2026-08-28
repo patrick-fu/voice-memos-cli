@@ -155,7 +155,7 @@ struct CommandRunner: Sendable {
             )
         }
         do {
-            let result = try write.execute(request, authorization: MutationAuthorization(token: token))
+            let result = try write.execute(request, authorization: MutationAuthorization(token: token, confirmed: confirmed))
             return success(result, human: "Completed \(result.operation) for \(result.id).\n", output: output)
         } catch {
             return adapterFailure(error, operation: request.operation.description, output: output)
@@ -170,6 +170,9 @@ struct CommandRunner: Sendable {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         }
         if let error = error as? RecordingAssetError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
+        }
+        if let error = error as? MutationAuthorizationError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         }
         return failure(
