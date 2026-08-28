@@ -109,9 +109,10 @@ private struct Delete: RoutedCommand {
 
 private struct Doctor: RoutedCommand {
     static let configuration = CommandConfiguration(abstract: "Check adapter availability and compatibility.")
+    @Flag(name: .long, help: "Also read current Accessibility trust without prompting.") var ui = false
     @OptionGroup var output: OutputOptions
 
-    func request() -> CommandRequest { .doctor }
+    func request() -> CommandRequest { .doctor(includeUI: ui) }
 }
 
 private struct OutputOptions: ParsableArguments {
@@ -138,7 +139,8 @@ private enum ProductionComposition {
     static let runner = CommandRunner(
         read: UnconfiguredReadPort(),
         asset: UnconfiguredAssetPort(),
-        write: UnconfiguredWritePort()
+        write: UnconfiguredWritePort(),
+        doctor: SystemDoctorPort()
     )
 }
 

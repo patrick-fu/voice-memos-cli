@@ -6,7 +6,7 @@ enum CommandRequest {
     case show(id: RecordingID)
     case export(id: RecordingID, destination: String)
     case mutation(request: MutationRequest, dryRun: Bool, token: String?, confirmed: Bool)
-    case doctor
+    case doctor(includeUI: Bool = false)
 }
 
 enum OutputFormat {
@@ -30,17 +30,20 @@ struct CommandRunner: Sendable {
     let read: any RecordingReadPort
     let asset: any RecordingAssetPort
     let write: any RecordingWritePort
+    let doctor: any DoctorPort
     let encoder: any CommandOutputEncoder
 
     init(
         read: any RecordingReadPort,
         asset: any RecordingAssetPort,
         write: any RecordingWritePort,
+        doctor: any DoctorPort = UnconfiguredDoctorPort(),
         encoder: any CommandOutputEncoder = JSONOutputEncoder()
     ) {
         self.read = read
         self.asset = asset
         self.write = write
+        self.doctor = doctor
         self.encoder = encoder
     }
 
@@ -61,13 +64,17 @@ struct CommandRunner: Sendable {
                 return success(receipt, human: "Exported \(receipt.id).\n", output: output)
             case let .mutation(request, dryRun, token, confirmed):
                 return runMutation(request, dryRun: dryRun, token: token, confirmed: confirmed, output: output)
-            case .doctor:
-                return failure(
-                    code: "adapter_not_configured",
-                    message: "No production adapter is configured for doctor.",
-                    exitCode: ProcessExit.safetyFailure.rawValue,
-                    output: output
-                )
+            case let .doctor(includeUI):
+                do {
+                    return diagnostic(try doctor.inspect(includeUI: includeUI), output: output)
+                } catch {
+                    return failure(
+                        code: "doctor_probe_failed",
+                        message: "Doctor diagnostics could not complete.",
+                        exitCode: ProcessExit.operationalFailure.rawValue,
+                        output: output
+                    )
+                }
             }
         } catch let error as VMemoError {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
@@ -92,6 +99,24 @@ struct CommandRunner: Sendable {
         case .json:
             do {
                 return CommandResult(exitCode: 0, stdout: try encoder.success(payload) + "\n", stderr: "")
+            } catch {
+                return failure(
+                    code: "output_encoding_failed",
+                    message: "Unable to encode command output.",
+                    exitCode: ProcessExit.operationalFailure.rawValue,
+                    output: output
+                )
+            }
+        }
+    }
+
+    private func diagnostic(_ report: DoctorReport, output: OutputFormat) -> CommandResult {
+        switch output {
+        case .human:
+            return CommandResult(exitCode: report.exitCode, stdout: render(report), stderr: "")
+        case .json:
+            do {
+                return CommandResult(exitCode: report.exitCode, stdout: try encoder.success(report) + "\n", stderr: "")
             } catch {
                 return failure(
                     code: "output_encoding_failed",
@@ -203,6 +228,19 @@ private func render(_ recordings: [RecordingSummary]) -> String {
 
 private func render(_ recording: RecordingSummary) -> String {
     "\(recording.id)\t\(recording.title)\n"
+}
+
+private func render(_ report: DoctorReport) -> String {
+    "Doctor: \(report.status.rawValue)\n" + report.checks.map { check in
+        let details = check.details.map(singleLineDetail).joined(separator: "; ")
+        return "\(check.id)\t\(check.status.rawValue)\t\(check.code)\t\(details)\n"
+    }.joined()
+}
+
+private func singleLineDetail(_ value: String) -> String {
+    value.replacingOccurrences(of: "\r", with: " ")
+        .replacingOccurrences(of: "\n", with: " ")
+        .replacingOccurrences(of: "\t", with: " ")
 }
 
 private struct RecordingsPayload: Encodable {

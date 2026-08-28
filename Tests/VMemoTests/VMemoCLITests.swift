@@ -24,6 +24,25 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "adapter_not_configured")
     }
 
+    func testDoctorSubprocessWritesAReportForHumanJSONAndExplicitUIModes() throws {
+        let human = try runVMemo("doctor")
+        XCTAssertEqual(human.stderr, "")
+        XCTAssertTrue(human.stdout.hasPrefix("Doctor: "))
+        XCTAssertTrue([0, 4, 5].contains(human.status))
+
+        let json = try runVMemo("doctor", "--json")
+        XCTAssertEqual(json.stderr, "")
+        let jsonReport = try doctorReport(from: json)
+        XCTAssertEqual(jsonReport.checks, ["runtime", "voice_memos", "library", "schema", "signing"])
+        XCTAssertEqual(json.status, exitStatus(for: jsonReport.status))
+
+        let uiJSON = try runVMemo("doctor", "--ui", "--json")
+        XCTAssertEqual(uiJSON.stderr, "")
+        let uiReport = try doctorReport(from: uiJSON)
+        XCTAssertEqual(uiReport.checks, ["runtime", "voice_memos", "library", "schema", "signing", "ui_accessibility"])
+        XCTAssertEqual(uiJSON.status, exitStatus(for: uiReport.status))
+    }
+
     func testRenameFailsClosedWhenSystemMutationAdapterIsUnconfigured() throws {
         let result = try runVMemo("rename", "--id", "opaque-recording-id", "--title", "Renamed", "--token", "fixture-token", "--confirm", "--json")
 
@@ -251,6 +270,25 @@ final class VMemoCLITests: XCTestCase {
 
     private func decodeJSON(_ text: String) throws -> [String: Any] {
         try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+    }
+
+    private func doctorReport(from result: ProcessResult) throws -> (status: String, checks: [String]) {
+        let envelope = try decodeJSON(result.stdout)
+        XCTAssertEqual(envelope["version"] as? Int, 1)
+        XCTAssertEqual(envelope["status"] as? String, "ok")
+        let data = try XCTUnwrap(envelope["data"] as? [String: Any])
+        let status = try XCTUnwrap(data["status"] as? String)
+        let checks = try XCTUnwrap(data["checks"] as? [[String: Any]]).compactMap { $0["id"] as? String }
+        return (status, checks)
+    }
+
+    private func exitStatus(for doctorStatus: String) -> Int32 {
+        switch doctorStatus {
+        case "ready": 0
+        case "blocked": 4
+        case "incomplete": 5
+        default: -1
+        }
     }
 }
 

@@ -205,3 +205,9 @@ struct UnconfiguredWritePort: RecordingWritePort {
         throw VMemoError.adapterNotConfigured(operation: request.operation.description)
     }
 }
+
+struct UnconfiguredDoctorPort: DoctorPort {
+    func inspect(includeUI: Bool) throws -> DoctorReport {
+        throw VMemoError.adapterNotConfigured(operation: "doctor")
+    }
+}
