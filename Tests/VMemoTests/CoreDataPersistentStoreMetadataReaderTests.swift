@@ -51,10 +51,14 @@ final class CoreDataPersistentStoreMetadataReaderTests: XCTestCase {
             metadata.persistenceFrameworkVersion,
             .integer(try integer(rawMetadata["NSPersistenceFrameworkVersion"]))
         )
-        XCTAssertEqual(
-            metadata.persistenceMaximumFrameworkVersion,
-            .integer(try integer(rawMetadata["NSPersistenceMaximumFrameworkVersion"]))
-        )
+        if rawMetadata.keys.contains("NSPersistenceMaximumFrameworkVersion") {
+            XCTAssertEqual(
+                metadata.persistenceMaximumFrameworkVersion,
+                .integer(try integer(rawMetadata["NSPersistenceMaximumFrameworkVersion"]))
+            )
+        } else {
+            XCTAssertEqual(metadata.persistenceMaximumFrameworkVersion, .unsupportedValue)
+        }
         XCTAssertEqual(metadata.storeType, .string(try XCTUnwrap(rawMetadata[NSStoreTypeKey] as? String)))
         XCTAssertEqual(
             metadata.modelVersionIdentifiers,
