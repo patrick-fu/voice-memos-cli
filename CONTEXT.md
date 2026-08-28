@@ -31,3 +31,11 @@ _Avoid_: Delete
 **Export**:
 Creating a user-owned copy of a Recording without changing the Recording managed by Voice Memos.
 _Avoid_: Move, detach
+
+**Interactive GUI Session**:
+A logged-in, unlocked macOS session where Voice Memos can be made visible and its UI state can be verified before and after an action.
+_Avoid_: Background session, headless session
+
+**Unattended Mutation**:
+A token-confirmed Rename or Delete initiated without a human actively present, allowed only in an Interactive GUI Session with fresh pre-action and post-action verification.
+_Avoid_: Background mutation, blind automation
