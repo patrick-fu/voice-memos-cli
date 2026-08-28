@@ -1,6 +1,6 @@
 # 真实 Voice Memos 只读 schema adapter：允许表与阻断条件
 
-研究日期：2026-08-28。对应 [issue #21](https://github.com/patrick-fu/voice-memos-cli/issues/21)。本文件只定义生产代码**可检测的结构**和必须拒绝的情况；它不把 Core Data 私有 SQLite 格式变成公开 API 合同，也不授权查询真实库的 recording 行。
+研究日期：2026-08-29。对应 [issue #25](https://github.com/patrick-fu/voice-memos-cli/issues/25)（并延续 [issue #21](https://github.com/patrick-fu/voice-memos-cli/issues/21) 的语义边界）。本文件只定义生产代码**可检测的结构**和必须拒绝的情况；它不把 Core Data 私有 SQLite 格式变成公开 API 合同，也不授权查询真实库的 recording 行。
 
 ## 结论
 
@@ -25,7 +25,7 @@
 | **Inference** | 为 fail-closed 产品行为作的设计选择。 | runtime gate、拒绝策略和安全路径策略。 |
 | **Needs disposable-user validation** | 只能在隔离 macOS 用户、无真实 iCloud 数据的手动 matrix 验证。 | Title、state、placeholder、asset 与 macOS 15 支持。 |
 
-本研究没有打开、复制、查询 `CloudRecordings.db`，没有读取任何录音/标题/转写，也没有请求 TCC、AX、UI 或启动 Voice Memos。
+本次验证使用了用户明确授权的 owner-only SQLite online backup、Apple bundle metadata 与 Voice Memos UI 状态；snapshot integrity ok，备份期间源 DB/WAL/SHM metadata 未变化。除两条专门创建的 disposable active sample 的脱敏字段关系外，不记录真实 title、ID、path，也没有读取录音、触发 TCC 权限提示或成功执行 UI mutation。
 
 ## 已观察的 macOS 26 Apple 元数据
 
@@ -65,12 +65,12 @@ shasum -a 256 "$MODEL/VoiceMemos14.mom"
 | `Migration` | `C9+RC8Owb0OTnIogkfdqVeaZV1hChUC6VuqvEwC0DUU=` |
 | `Recording` | `l+6Nf+h4pgpvs9n/EqyKB5n5y0F2UwNh6/6d/evM+L8=` |
 
-**Apple metadata（观察，runtime model）：** 将同一个 `VoiceMemos14.mom` 加入 `NSPersistentStoreCoordinator` 后，运行时 `entityVersionHashesByName["CloudRecording"]` 是 **`Q5vgte0JyNzGeRWTSQMvMe/yCVv4FqwlLinaPgrxQpw=`**，model-level `versionChecksum` 是 **`Rzot3jLpeh6rB1e94kW4C0J/n0J243OW8MgFMbjWzE4=`**。前者是本 adapter 与 snapshot metadata 比较的 `CloudRecording` token；后者是整个 runtime model 的身份 fingerprint。二者也不可与 `VersionInfo.plist` 的 model checksum `f2V…` 混用。
+**Apple metadata（观察，runtime model）：** 将同一个 `VoiceMemos14.mom` 加入 `NSPersistentStoreCoordinator` 后，运行时 `entityVersionHashesByName["CloudRecording"]` 是 **`Q5vgte0JyNzGeRWTSQMvMe/yCVv4FqwlLinaPgrxQpw=`**，model-level `versionChecksum` 是 **`Rzot3jLpeh6rB1e94kW4C0J/n0J243OW8MgFMbjWzE4=`**。二者共同构成 bundle-loaded runtime model 的身份 fingerprint，但不与 snapshot store manifest 比较，也不可与 `VersionInfo.plist` 的 model checksum `f2V…` 混用。
 
 | gate 角色 | runtime token | 用途 |
 | --- | --- | --- |
-| `CloudRecording` entity | `Q5vgte0JyNzGeRWTSQMvMe/yCVv4FqwlLinaPgrxQpw=` | 属于整份 runtime entity-hash dictionary 的一个值；该 dictionary 必须与 store metadata 的 `NSStoreModelVersionHashesKey` 完全相等。 |
-| whole `VoiceMemos14` model | `Rzot3jLpeh6rB1e94kW4C0J/n0J243OW8MgFMbjWzE4=` | bundle-loaded runtime model fingerprint；不取代 entity-hash compatibility comparison。 |
+| `CloudRecording` entity | `Q5vgte0JyNzGeRWTSQMvMe/yCVv4FqwlLinaPgrxQpw=` | 属于整份 runtime entity-hash dictionary 的一个值；只核验 bundle-loaded artifact identity。 |
+| whole `VoiceMemos14` model | `Rzot3jLpeh6rB1e94kW4C0J/n0J243OW8MgFMbjWzE4=` | bundle-loaded runtime model fingerprint；不取代独立 observed store manifest gate。 |
 
 可复现的纯 bundle/runtime-model dump（不打开 store）：
 
@@ -85,6 +85,20 @@ for (name, hash) in m.entityVersionHashesByName.sorted(by: { $0.key < $1.key }) 
 print("model.versionChecksum=\(m.versionChecksum)")
 _ = c'
 ```
+
+### 已观察的 build 1380 store manifest（脱敏）
+
+**Observed fact（owner-only online backup）：** bundle 为 `com.apple.VoiceMemos` build `1380`，macOS `26.6.1`；store type `SQLite`，Core Data framework/max version `1526`，hash metadata version `3`，model version identifiers exact 为 `[""]`。实际 store 的 `CloudRecording` entity hash 为 `wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ=`，store model checksum 为 `n+kk0f+uLXPDvdioHyMqmLay6VQ65HLL8r1c4DUtcII=`，store hashes digest 为 `8aTQVFaRoWcJjSrfUWGNhWxyl4H+gmCjrDT9k9CLVmm9OnpUALJH6sPZWbA1xKKrPOrD6x93sSkxLvIrC13PCA==`。其余五个 entity hash 与本文静态值一致；momd/optimized model 的 `CloudRecording` hash 为 `eDRSM…`（见上方归档表），runtime `.mom` hash 为 `Q5vg…`；所有 bundle model 版本均不与该 store exact 或 compatible。
+
+这组值是当前唯一可放行的**独立 observed store manifest**，不是 Apple contract，也不是 runtime `.mom` 的替代品。旧版“store hashes 必须 exact 等于 static/runtime model，并且 `isConfiguration` 为 true”的 gate 已撤回；实测该假设会把已验证 store 错误判为 `unsupported_schema`。
+
+**Physical schema observation（single build/store）：** `ZCLOUDRECORDING` 的 exact canonical schema（按 `cid` 排序的 `cid|name|type|notnull|default|pk`，共 29 列）以 SHA-256 `9f3c4d7a46bb8ef37028fefdaf30ef1da7d0e93b9494877e3871fdae40a9a511` 固化；声明类型观察到 `INTEGER`、`FLOAT`、`TIMESTAMP`、`VARCHAR`、`BLOB`。这只是 build 1380 的单一 store fingerprint，不是 Apple contract；不得据此推导 affinity、epoch、bit 意义或跨版本兼容性，也不得把未验证的其他表声明写入 gate。
+
+**Disposable samples（两条、专门创建、脱敏）：** UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` 一致；`ZCUSTOMLABEL` 为 UTC timestamp；`ZPATH` 为相对 `.m4a`；`duration`/`localDuration` 与 UI 秒数一致；`evictionDate` 为 `NULL`、`flags=516`、`folder` 为 `NULL`。未记录真实 title/ID/path。两条样本不足以定义 title fallback，或 active/deleted/placeholder predicate。
+
+其中一条样本另做 owner-only `/tmp` copy 验收：source `lstat` 为 regular、非 symlink；destination 预先不存在；复制前后 source metadata 不变；source/destination SHA-256 相等；`file` 识别为 ISO Media Apple iTunes ALAC/AAC-LC `.M4A`（约 3 KB）。不记录文件名或内容 hash；该结果只证明本次样本的安全复制行为，不构成通用 asset/type 合同。
+
+Computer Use edit action 不可用，未发生 rename；delete 未尝试。
 
 Apple 将 runtime entity version hash 定义为持久化相关 entity/property 的 hash，且该信息会存进 store metadata；`NSStoreModelVersionHashesKey` 正是 metadata 中该信息的 key。[`NSEntityDescription.versionHash`](https://developer.apple.com/documentation/coredata/nsentitydescription/versionhash) [Store versions](https://developer.apple.com/documentation/coredata/store-versions) 这能识别 model 兼容性，**不**证明应用层 state 或字段内容语义未变。
 
@@ -133,12 +147,12 @@ for p in m.entitiesByName["CloudRecording"]!.properties.sorted(by: { $0.name < $
 这是 **inference**，目标是把 private-store 漂移变成明确的 `unsupported_schema`，而不是冒险猜字段。所有检查均针对已经通过 `SnapshotPort` 得到的只读 snapshot；不可读取 live 主库或用 `immutable=1`/`nolock=1` 绕过 WAL 协调。snapshot 边界见 [`sqlite-snapshot-strategy.md`](sqlite-snapshot-strategy.md) 和 [`test-fixtures-and-integration-isolation.md`](test-fixtures-and-integration-isolation.md)。
 
 1. `sw_vers` 主版本必须为 `26`；Voice Memos bundle 的 bundle ID 必须为 `com.apple.VoiceMemos`、`CFBundleVersion` 必须为 `1380`。任何 OS/build 偏差一律 `unsupported_schema`，包括 macOS 15。
-2. 必须存在 Apple framework 的 `VoiceMemos14.mom` 和 `VersionInfo.plist`，并匹配 current-name、`VersionInfo` archived model checksum `f2V…`、`.mom` SHA-256；这些只确认 bundle artifact。再从该 `.mom` 实例化 runtime model，并要求 `entityVersionHashesByName["CloudRecording"] == Q5vgte0JyNzGeRWTSQMvMe/yCVv4FqwlLinaPgrxQpw=`、`versionChecksum == Rzot3jLpeh6rB1e94kW4C0J/n0J243OW8MgFMbjWzE4=`。不得把 archived `eDRSM…` 当作 runtime `CloudRecording` hash，否则 gate 会错误拒绝当前 bundle。
-3. 用 Apple 的 persistent-store metadata API 从 snapshot 读取 metadata。将 metadata 的 `NSStoreModelVersionHashesKey` 解为 `[String: Data]` 后，必须与 runtime `model.entityVersionHashesByName` 做**精确相等**：key-set 相同，且每个 entity 的 value 都是相同的 32-byte 数据；不能只检查 `CloudRecording == Q5vg…`。随后才调用 `NSManagedObjectModel.isConfiguration(_:compatibleWithStoreMetadata:)`，且也必须为真；它只是额外检查，绝不替代上述逐 entity bytes equality。任何缺 key、额外 key、类型不符、长度非 32 或任一 byte 差异均为 `unsupported_schema`。Core Data 文档把 metadata 与 compatibility comparison 作为版本机制；model version identifiers 只是 debug hint，不能单独用作 gate。[`NSManagedObjectModel`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel) [`versionIdentifiers`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel/versionidentifiers)
-4. 当前 recognizer **不查询 application 的物理 table/column，也不以任何物理 table/column 名作放行或拒绝条件**。它只要求 snapshot 的 Core Data metadata 可读取，并通过前 1–3 项的 OS/build/runtime-model identity 与 exact entity-hash equality。尤其禁止对 recording rows 执行 `SELECT`、读取 value，或调用 `sqlite3_column_type`；当前路径是 metadata/schema-only，不得把 row value、SQLite affinity 或 Core Data type mapping 当作 runtime signal。`ZCLOUDRECORDING`、`ZFOLDER`、`ZUNIQUEID` 等是既有研究记录的 candidate fingerprint，不是本轮可移植、production-required allowlist；没有 disposable matrix 证据不得把缺列/多列/声明差异映射成兼容或不兼容。
+2. 必须存在 Apple framework 的 `VoiceMemos14.mom` 和 `VersionInfo.plist`，并匹配 current-name、`VersionInfo` archived model checksum `f2V…`、`.mom` SHA-256 `551215…`；这些只确认 bundle artifact。再从该 `.mom` 实例化 runtime model，并核验 runtime `CloudRecording` hash `Q5vg…` 与 model checksum `Rzot…`，但**不得**要求它们等于 store manifest。
+3. 用 Apple 的 persistent-store metadata API 从 snapshot 读取 metadata，并对独立 observed store manifest 做 exact match：`CloudRecording` hash `wzISBP+…`、store model checksum `n+kk0f+…`、digest `8aTQ…PCA==`、hash version `3`、framework/max `1526`、store type `SQLite`、model version identifiers `[""]`，以及其余五个 entity hash 的完整值。任何缺 key、额外 key、类型/长度/value mismatch 均为 `unsupported_schema`。`NSManagedObjectModel.isConfiguration(_:compatibleWithStoreMetadata:)` 仅作诊断，不是放行条件；其结果（包括与 bundle model 不 compatible）不得单独导致 fail-closed。Core Data metadata/version API 仍仅用于读取与诊断。[`NSManagedObjectModel`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel) [`versionIdentifiers`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel/versionidentifiers)
+4. recognizer 只允许 exact 匹配上述独立 store manifest，命中后仍返回 `needs_disposable_validation`，绝不启用 real list/search/show/export。物理列声明（包括 `ZCLOUDRECORDING`）只记录为 single build/store observation；在 disposable matrix 完成前，不得把列名、affinity、row value 或 `sqlite3_column_type` 作为放行/拒绝条件。
 5. `PRAGMA schema_version=1326` 若出现，只可写入 diagnostic fingerprint，**绝不可**作为单独或决定性 token。它是 SQLite schema-cookie，不是 Apple model/version 合同；单独相同的 cookie 不能证明字段语义、model hash 或 app build 相同。
 
-第 4 点故意没有伪造“已验证的精确 SQLite declarations”：本研究不能读实际 `PRAGMA table_info`，现有 Apple model 也不承诺 SQLite DDL。因此下列断言目前均为 **unsupported，不能写死进 production allowlist**：`ZDATE` 的具体 SQLite type/epoch、`ZDURATION` 的 declaration、`ZFLAGS` bit 宽度/意义、`ZFOLDER` 的 FK/NULL/ON DELETE 行为、`Z_METADATA` 的行数/列格式和 `Z_PLIST` 编码，以及任何 affinity→Core Data type mapping 或 row-value validation。把这些提升为 exact contract 前，必须完成下述 disposable-user matrix。
+第 4 点只把上方 canonical `ZCLOUDRECORDING` fingerprint 作为 observed fact 保存，不把它误升格为 Apple 合同。下列断言仍为 **unsupported，不能写死进 production allowlist**：`ZDATE` 的具体 SQLite type/epoch、`ZDURATION` 的 declaration、`ZFLAGS` bit 宽度/意义、`ZFOLDER` 的 FK/NULL/ON DELETE 行为、`Z_METADATA` 的行数/列格式和 `Z_PLIST` 编码，以及任何 affinity→Core Data type mapping 或 row-value validation。把这些提升为 exact contract 前，必须完成下述 disposable-user matrix。
 
 ## Issue #21 的语义问题
 
@@ -207,8 +221,8 @@ ZDURATION >= <threshold>
 ## 实施顺序与验收
 
 1. 保持现有 `SchemaAdapter` 的 synthetic-only 行为；不要把 `SyntheticSchemaFixture.Revision.macOS15/macOS26` 解释为真实 schema 支持。
-2. 新增独立 `RealSchemaRecognizer` 时只读取 snapshot header/schema metadata，并以本文件第 4 节 gate 返回 `recognizedButSemanticsUnvalidated`、`unsupported_schema` 或 `needs_disposable_validation`；不得 SQL 投影用户行。
-3. 为 recognizer 写 synthetic metadata contract tests：错 build、错 `.mom` hash、缺/多 entity key、任一 entity hash 的任一 byte 改动（即使 `isConfiguration(_:compatibleWithStoreMetadata:)` 仍返回 true）、值非 32 bytes、metadata 不可读取/不兼容、仅 `schema_version=1326`、未知 OS，全部 fail closed。另写不进入当前 gate 的 future physical-fingerprint tests：它们只在 disposable matrix 固定 exact DDL/column manifest 后，才可变成 row-reader 的升级测试；真实 DB/asset 不进入 tests。
+2. 新增独立 `RealSchemaRecognizer` 时只读取 snapshot header/schema metadata，并以本文件第 4 节 gate 返回 `unsupported_schema` 或 `needs_disposable_validation`；不得 SQL 投影用户行。
+3. 为 recognizer 写 synthetic metadata contract tests：错 build、错 `.mom` hash、缺/多 manifest key、任一 hash 的任一 byte 改动（即使 `isConfiguration(_:compatibleWithStoreMetadata:)` 返回 true）、值非 32 bytes、metadata 不可读取、manifest version identifiers 非 `[""]`、仅 `schema_version=1326`、未知 OS，全部因 manifest mismatch fail closed。`isConfiguration` 返回 false 仅记录 diagnostic，不作为失败条件。另写不进入当前 gate 的 future physical-fingerprint tests：它们只在 disposable matrix 固定 exact DDL/column manifest 后，才可变成 row-reader 的升级测试；真实 DB/asset 不进入 tests。
 4. 完成上节所有 macOS 26 matrix 后，才把验证结果（固定 build/model/DDL/state/title/asset manifest）加入 allowlist，并以新的 issue 决定是否实现 row reader。macOS 15 单独走相同流程。
 
 **可进入实现的范围：** recognizer、错误码、synthetic contract tests。**不可进入实现的范围：** real list/search/show/export、title fallback、active/deleted filtering、placeholder detection、资产复制。证据强度足以实现前者，不足以安全实现后者。

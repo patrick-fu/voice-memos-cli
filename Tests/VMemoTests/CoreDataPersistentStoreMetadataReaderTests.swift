@@ -16,6 +16,11 @@ final class CoreDataPersistentStoreMetadataReaderTests: XCTestCase {
         let before = try DirectoryAudit.capture(fixture.sourceRoot)
 
         let metadata = try reader.readMetadata(from: lease)
+        let rawMetadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(
+            ofType: NSSQLiteStoreType,
+            at: lease.url,
+            options: [NSReadOnlyPersistentStoreOption: true]
+        )
 
         XCTAssertEqual(try DirectoryAudit.capture(fixture.sourceRoot), before)
         XCTAssertTrue(metadata.isCompatibleWithRuntimeModel)
@@ -30,6 +35,31 @@ final class CoreDataPersistentStoreMetadataReaderTests: XCTestCase {
             XCTAssertEqual(actualHash.count, 32)
             XCTAssertEqual(actualHash, expectedHash)
         }
+        XCTAssertEqual(
+            metadata.modelVersionChecksum,
+            .string(try XCTUnwrap(rawMetadata["NSStoreModelVersionChecksumKey"] as? String))
+        )
+        XCTAssertEqual(
+            metadata.modelVersionHashesDigest,
+            .string(try XCTUnwrap(rawMetadata["NSStoreModelVersionHashesDigest"] as? String))
+        )
+        XCTAssertEqual(
+            metadata.modelVersionHashesVersion,
+            .integer(try integer(rawMetadata["NSStoreModelVersionHashesVersion"]))
+        )
+        XCTAssertEqual(
+            metadata.persistenceFrameworkVersion,
+            .integer(try integer(rawMetadata["NSPersistenceFrameworkVersion"]))
+        )
+        XCTAssertEqual(
+            metadata.persistenceMaximumFrameworkVersion,
+            .integer(try integer(rawMetadata["NSPersistenceMaximumFrameworkVersion"]))
+        )
+        XCTAssertEqual(metadata.storeType, .string(try XCTUnwrap(rawMetadata[NSStoreTypeKey] as? String)))
+        XCTAssertEqual(
+            metadata.modelVersionIdentifiers,
+            .array(try XCTUnwrap(rawMetadata[NSStoreModelVersionIdentifiersKey] as? [String]))
+        )
     }
 
     func testReaderCopiesModelBeforeCallerMutatesIt() throws {
@@ -47,6 +77,30 @@ final class CoreDataPersistentStoreMetadataReaderTests: XCTestCase {
         let metadata = try reader.readMetadata(from: lease)
 
         XCTAssertTrue(metadata.isCompatibleWithRuntimeModel)
+    }
+
+    func testIntegerValueAcceptsOnlyExactIntegerCFNumbers() {
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(true), .unsupportedValue)
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(false), .unsupportedValue)
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: true)), .unsupportedValue)
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: Double(3.0))), .unsupportedValue)
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: Float(3.0))), .unsupportedValue)
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: 3)), .integer(3))
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: -7)), .integer(-7))
+        XCTAssertEqual(CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: Int.max)), .integer(Int.max))
+        XCTAssertEqual(
+            CoreDataPersistentStoreMetadataReader.integerValue(NSNumber(value: UInt64(Int.max) + 1)),
+            .unsupportedValue
+        )
+    }
+
+    private func integer(_ value: Any?) throws -> Int {
+        let number = try XCTUnwrap(value as? NSNumber)
+        XCTAssertEqual(CFGetTypeID(number), CFNumberGetTypeID())
+        XCTAssertFalse(CFNumberIsFloatType(number))
+        var int64: Int64 = 0
+        XCTAssertTrue(CFNumberGetValue(number, .sInt64Type, &int64))
+        return try XCTUnwrap(Int(exactly: int64))
     }
 }
 

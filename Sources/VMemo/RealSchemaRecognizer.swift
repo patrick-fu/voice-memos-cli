@@ -1,4 +1,5 @@
 import CoreData
+import CoreFoundation
 import Foundation
 
 /// The system and bundle evidence required to recognize the documented macOS 26 model.
@@ -38,6 +39,13 @@ protocol PersistentStoreMetadataReading: Sendable {
 
 struct PersistentStoreMetadata: Equatable, Sendable {
     var entityVersionHashes: PersistentStoreEntityVersionHashes
+    var modelVersionChecksum: PersistentStoreMetadataString
+    var modelVersionHashesDigest: PersistentStoreMetadataString
+    var modelVersionHashesVersion: PersistentStoreMetadataInteger
+    var persistenceFrameworkVersion: PersistentStoreMetadataInteger
+    var persistenceMaximumFrameworkVersion: PersistentStoreMetadataInteger
+    var storeType: PersistentStoreMetadataString
+    var modelVersionIdentifiers: PersistentStoreMetadataStringArray
     var isCompatibleWithRuntimeModel: Bool
 }
 
@@ -48,6 +56,21 @@ enum PersistentStoreEntityVersionHashes: Equatable, Sendable {
 
 enum PersistentStoreMetadataValue: Equatable, Sendable {
     case data(Data)
+    case unsupportedValue
+}
+
+enum PersistentStoreMetadataString: Equatable, Sendable {
+    case string(String)
+    case unsupportedValue
+}
+
+enum PersistentStoreMetadataInteger: Equatable, Sendable {
+    case integer(Int)
+    case unsupportedValue
+}
+
+enum PersistentStoreMetadataStringArray: Equatable, Sendable {
+    case array([String])
     case unsupportedValue
 }
 
@@ -83,8 +106,59 @@ struct CoreDataPersistentStoreMetadataReader: PersistentStoreMetadataReading, @u
         }
         return PersistentStoreMetadata(
             entityVersionHashes: entityVersionHashes,
+            modelVersionChecksum: stringValue(in: metadata, forKey: "NSStoreModelVersionChecksumKey"),
+            modelVersionHashesDigest: stringValue(in: metadata, forKey: "NSStoreModelVersionHashesDigest"),
+            modelVersionHashesVersion: integerValue(in: metadata, forKey: "NSStoreModelVersionHashesVersion"),
+            persistenceFrameworkVersion: integerValue(in: metadata, forKey: "NSPersistenceFrameworkVersion"),
+            persistenceMaximumFrameworkVersion: integerValue(in: metadata, forKey: "NSPersistenceMaximumFrameworkVersion"),
+            storeType: stringValue(in: metadata, forKey: NSStoreTypeKey),
+            modelVersionIdentifiers: stringArrayValue(in: metadata, forKey: NSStoreModelVersionIdentifiersKey),
             isCompatibleWithRuntimeModel: model.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata)
         )
+    }
+
+    private func stringValue(in metadata: [String: Any], forKey key: String) -> PersistentStoreMetadataString {
+        guard let value = metadata[key] as? String else { return .unsupportedValue }
+        return .string(value)
+    }
+
+    private func integerValue(in metadata: [String: Any], forKey key: String) -> PersistentStoreMetadataInteger {
+        Self.integerValue(metadata[key])
+    }
+
+    static func integerValue(_ value: Any?) -> PersistentStoreMetadataInteger {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) == CFNumberGetTypeID()
+        else {
+            return .unsupportedValue
+        }
+        let cfNumber = number as CFNumber
+        guard !CFNumberIsFloatType(cfNumber) else {
+            return .unsupportedValue
+        }
+        if number.compare(0) == .orderedAscending {
+            var int64: Int64 = 0
+            guard CFNumberGetValue(cfNumber, .sInt64Type, &int64),
+                  let integer = Int(exactly: int64)
+            else {
+                return .unsupportedValue
+            }
+            return .integer(integer)
+        }
+        // Unsigned CFNumbers above Int.max wrap when read as SInt64.
+        guard let integer = Int(exactly: number.uint64Value) else {
+            return .unsupportedValue
+        }
+        return .integer(integer)
+    }
+
+    private func stringArrayValue(in metadata: [String: Any], forKey key: String) -> PersistentStoreMetadataStringArray {
+        guard let values = metadata[key] as? [Any],
+              values.allSatisfy({ $0 is String })
+        else {
+            return .unsupportedValue
+        }
+        return .array(values.compactMap { $0 as? String })
     }
 }
 
@@ -104,8 +178,7 @@ struct RealSchemaRecognizer: Sendable {
     func recognize(snapshot: any SnapshotLease) -> RealSchemaRecognition {
         guard isDocumentedIdentity(identity) else { return .unsupportedSchema }
         guard let metadata = try? metadataReader.readMetadata(from: snapshot),
-              hasExactRuntimeEntityHashes(metadata, runtimeHashes: identity.runtimeEntityVersionHashesByName),
-              metadata.isCompatibleWithRuntimeModel
+              hasExactObservedStoreManifest(metadata)
         else {
             return .unsupportedSchema
         }
@@ -125,16 +198,20 @@ struct RealSchemaRecognizer: Sendable {
             && identity.runtimeEntityVersionHashesByName == DocumentedRealSchema.runtimeEntityVersionHashesByName
     }
 
-    private func hasExactRuntimeEntityHashes(
-        _ metadata: PersistentStoreMetadata,
-        runtimeHashes: [String: Data]
-    ) -> Bool {
+    private func hasExactObservedStoreManifest(_ metadata: PersistentStoreMetadata) -> Bool {
         guard case let .dictionary(storeHashes) = metadata.entityVersionHashes,
-              Set(storeHashes.keys) == Set(runtimeHashes.keys)
+              Set(storeHashes.keys) == Set(DocumentedRealSchema.observedStoreEntityVersionHashesByName.keys),
+              metadata.modelVersionChecksum == .string(DocumentedRealSchema.observedStoreModelVersionChecksum),
+              metadata.modelVersionHashesDigest == .string(DocumentedRealSchema.observedStoreModelVersionHashesDigest),
+              metadata.modelVersionHashesVersion == .integer(DocumentedRealSchema.observedStoreModelVersionHashesVersion),
+              metadata.persistenceFrameworkVersion == .integer(DocumentedRealSchema.persistenceFrameworkVersion),
+              metadata.persistenceMaximumFrameworkVersion == .integer(DocumentedRealSchema.persistenceMaximumFrameworkVersion),
+              metadata.storeType == .string(NSSQLiteStoreType),
+              metadata.modelVersionIdentifiers == .array([""])
         else {
             return false
         }
-        for (entityName, expectedHash) in runtimeHashes {
+        for (entityName, expectedHash) in DocumentedRealSchema.observedStoreEntityVersionHashesByName {
             guard expectedHash.count == DocumentedRealSchema.entityHashLength,
                   case let .data(storeHash)? = storeHashes[entityName],
                   storeHash.count == DocumentedRealSchema.entityHashLength,
@@ -163,6 +240,19 @@ private enum DocumentedRealSchema {
         "Migration": data("C9+RC8Owb0OTnIogkfdqVeaZV1hChUC6VuqvEwC0DUU="),
         "Recording": data("l+6Nf+h4pgpvs9n/EqyKB5n5y0F2UwNh6/6d/evM+L8="),
     ]
+    static let observedStoreEntityVersionHashesByName: [String: Data] = [
+        "CloudRecording": data("wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ="),
+        "DatabaseProperty": data("DdeyItMrmgzYUVyA8NUAc8cS1Sr4LwwTo+KneZZrPBI="),
+        "EntityRevision": data("MCYSLwlQNrzkytEuk0Paa2vv7h+rbxnn3DWtIuHpxa0="),
+        "Folder": data("BTuJxZB4F1ci2UMqAPo0Fx2Oif08rXM0z+/UQoivHc0="),
+        "Migration": data("C9+RC8Owb0OTnIogkfdqVeaZV1hChUC6VuqvEwC0DUU="),
+        "Recording": data("l+6Nf+h4pgpvs9n/EqyKB5n5y0F2UwNh6/6d/evM+L8="),
+    ]
+    static let observedStoreModelVersionChecksum = "n+kk0f+uLXPDvdioHyMqmLay6VQ65HLL8r1c4DUtcII="
+    static let observedStoreModelVersionHashesDigest = "8aTQVFaRoWcJjSrfUWGNhWxyl4H+gmCjrDT9k9CLVmm9OnpUALJH6sPZWbA1xKKrPOrD6x93sSkxLvIrC13PCA=="
+    static let observedStoreModelVersionHashesVersion = 3
+    static let persistenceFrameworkVersion = 1526
+    static let persistenceMaximumFrameworkVersion = 1526
 
     private static func data(_ base64: String) -> Data {
         guard let data = Data(base64Encoded: base64), data.count == entityHashLength else {

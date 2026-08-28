@@ -60,7 +60,21 @@ private let sourceURL = URL(fileURLWithPath: "/synthetic/source.sqlite")
 private let destinationRoot = URL(fileURLWithPath: "/synthetic/snapshots", isDirectory: true)
 
 private let supportedStoreMetadata = PersistentStoreMetadata(
-    entityVersionHashes: .dictionary(coordinatorIdentity.runtimeEntityVersionHashesByName.mapValues(PersistentStoreMetadataValue.data)),
+    entityVersionHashes: .dictionary([
+        "CloudRecording": .data(Data(base64Encoded: "wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ=")!),
+        "DatabaseProperty": .data(Data(base64Encoded: "DdeyItMrmgzYUVyA8NUAc8cS1Sr4LwwTo+KneZZrPBI=")!),
+        "EntityRevision": .data(Data(base64Encoded: "MCYSLwlQNrzkytEuk0Paa2vv7h+rbxnn3DWtIuHpxa0=")!),
+        "Folder": .data(Data(base64Encoded: "BTuJxZB4F1ci2UMqAPo0Fx2Oif08rXM0z+/UQoivHc0=")!),
+        "Migration": .data(Data(base64Encoded: "C9+RC8Owb0OTnIogkfdqVeaZV1hChUC6VuqvEwC0DUU=")!),
+        "Recording": .data(Data(base64Encoded: "l+6Nf+h4pgpvs9n/EqyKB5n5y0F2UwNh6/6d/evM+L8=")!),
+    ]),
+    modelVersionChecksum: .string("n+kk0f+uLXPDvdioHyMqmLay6VQ65HLL8r1c4DUtcII="),
+    modelVersionHashesDigest: .string("8aTQVFaRoWcJjSrfUWGNhWxyl4H+gmCjrDT9k9CLVmm9OnpUALJH6sPZWbA1xKKrPOrD6x93sSkxLvIrC13PCA=="),
+    modelVersionHashesVersion: .integer(3),
+    persistenceFrameworkVersion: .integer(1526),
+    persistenceMaximumFrameworkVersion: .integer(1526),
+    storeType: .string("SQLite"),
+    modelVersionIdentifiers: .array([""]),
     isCompatibleWithRuntimeModel: true
 )
 

@@ -8,6 +8,29 @@ final class RealSchemaRecognizerTests: XCTestCase {
         XCTAssertEqual(RealSchemaRecognition.unsupportedSchema.code, "unsupported_schema")
     }
 
+    func testObservedBuild1380StoreMetadataNeedsDisposableValidation() {
+        var observedHashes = storeHashes()
+        observedHashes["CloudRecording"] = .data(
+            Data(base64Encoded: "wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ=")!
+        )
+        let observedStoreMetadata = PersistentStoreMetadata(
+            entityVersionHashes: .dictionary(observedHashes),
+            modelVersionChecksum: .string("n+kk0f+uLXPDvdioHyMqmLay6VQ65HLL8r1c4DUtcII="),
+            modelVersionHashesDigest: .string("8aTQVFaRoWcJjSrfUWGNhWxyl4H+gmCjrDT9k9CLVmm9OnpUALJH6sPZWbA1xKKrPOrD6x93sSkxLvIrC13PCA=="),
+            modelVersionHashesVersion: .integer(3),
+            persistenceFrameworkVersion: .integer(1526),
+            persistenceMaximumFrameworkVersion: .integer(1526),
+            storeType: .string("SQLite"),
+            modelVersionIdentifiers: .array([""]),
+            isCompatibleWithRuntimeModel: false
+        )
+
+        XCTAssertEqual(
+            recognize(storeMetadata: observedStoreMetadata),
+            .needsDisposableValidation
+        )
+    }
+
     func testExactDocumentedEvidenceIsRecognizedButStillBlockedForDisposableValidation() {
         let reader = FakePersistentStoreMetadataReader(
             result: .success(metadata(compatibleWithRuntimeModel: true))
@@ -62,58 +85,66 @@ final class RealSchemaRecognizerTests: XCTestCase {
     func testMissingOrExtraStoreEntityHashFailsClosed() {
         var missingHashes = storeHashes()
         missingHashes.removeValue(forKey: "Recording")
-        let missing = PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(missingHashes),
-            isCompatibleWithRuntimeModel: true
-        )
+        let missing = metadata(entityVersionHashes: .dictionary(missingHashes))
         XCTAssertEqual(recognize(storeMetadata: missing), .unsupportedSchema)
 
         var extraHashes = storeHashes()
         extraHashes["Unexpected"] = .data(Data(repeating: 0, count: 32))
-        let extra = PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(extraHashes),
-            isCompatibleWithRuntimeModel: true
-        )
+        let extra = metadata(entityVersionHashes: .dictionary(extraHashes))
         XCTAssertEqual(recognize(storeMetadata: extra), .unsupportedSchema)
     }
 
     func testStoreEntityHashWrongLengthValueOrRepresentationFailsClosed() {
         var wrongLengthHashes = storeHashes()
         wrongLengthHashes["CloudRecording"] = .data(Data(repeating: 0, count: 31))
-        let wrongLength = PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(wrongLengthHashes),
-            isCompatibleWithRuntimeModel: true
-        )
+        let wrongLength = metadata(entityVersionHashes: .dictionary(wrongLengthHashes))
         XCTAssertEqual(recognize(storeMetadata: wrongLength), .unsupportedSchema)
 
         var wrongValueHashes = storeHashes()
-        var altered = try! XCTUnwrap(supportedIdentity.runtimeEntityVersionHashesByName["CloudRecording"])
+        var altered = try! XCTUnwrap(Data(base64Encoded: "wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ="))
         altered[altered.startIndex] ^= 0x01
         wrongValueHashes["CloudRecording"] = .data(altered)
-        let wrongValue = PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(wrongValueHashes),
-            isCompatibleWithRuntimeModel: true
-        )
+        let wrongValue = metadata(entityVersionHashes: .dictionary(wrongValueHashes))
         XCTAssertEqual(recognize(storeMetadata: wrongValue), .unsupportedSchema)
 
         var wrongRepresentationHashes = storeHashes()
         wrongRepresentationHashes["CloudRecording"] = .unsupportedValue
-        let wrongRepresentation = PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(wrongRepresentationHashes),
-            isCompatibleWithRuntimeModel: true
-        )
+        let wrongRepresentation = metadata(entityVersionHashes: .dictionary(wrongRepresentationHashes))
         XCTAssertEqual(recognize(storeMetadata: wrongRepresentation), .unsupportedSchema)
 
         XCTAssertEqual(
-            recognize(storeMetadata: PersistentStoreMetadata(entityVersionHashes: .unsupportedRepresentation, isCompatibleWithRuntimeModel: true)),
+            recognize(storeMetadata: metadata(entityVersionHashes: .unsupportedRepresentation)),
             .unsupportedSchema
         )
     }
 
-    func testCompatibilityFailureFailsClosedEvenWithExactHashes() {
+    func testStoreManifestMismatchFailsClosed() {
+        let mismatches = [
+            metadata(modelVersionChecksum: .string("wrong")),
+            metadata(modelVersionChecksum: .unsupportedValue),
+            metadata(modelVersionHashesDigest: .string("wrong")),
+            metadata(modelVersionHashesDigest: .unsupportedValue),
+            metadata(modelVersionHashesVersion: .integer(4)),
+            metadata(modelVersionHashesVersion: .unsupportedValue),
+            metadata(persistenceFrameworkVersion: .integer(1525)),
+            metadata(persistenceFrameworkVersion: .unsupportedValue),
+            metadata(persistenceMaximumFrameworkVersion: .integer(1525)),
+            metadata(persistenceMaximumFrameworkVersion: .unsupportedValue),
+            metadata(storeType: .string("Binary")),
+            metadata(storeType: .unsupportedValue),
+            metadata(modelVersionIdentifiers: .array([])),
+            metadata(modelVersionIdentifiers: .unsupportedValue),
+        ]
+
+        for mismatch in mismatches {
+            XCTAssertEqual(recognize(storeMetadata: mismatch), .unsupportedSchema)
+        }
+    }
+
+    func testStaticModelCompatibilityIsDiagnosticAndDoesNotGateObservedManifest() {
         XCTAssertEqual(
             recognize(storeMetadata: metadata(compatibleWithRuntimeModel: false)),
-            .unsupportedSchema
+            .needsDisposableValidation
         )
     }
 
@@ -146,15 +177,39 @@ final class RealSchemaRecognizerTests: XCTestCase {
         ).recognize(snapshot: isolatedSnapshot)
     }
 
-    private func metadata(compatibleWithRuntimeModel: Bool) -> PersistentStoreMetadata {
+    private func metadata(
+        entityVersionHashes: PersistentStoreEntityVersionHashes? = nil,
+        modelVersionChecksum: PersistentStoreMetadataString = .string("n+kk0f+uLXPDvdioHyMqmLay6VQ65HLL8r1c4DUtcII="),
+        modelVersionHashesDigest: PersistentStoreMetadataString = .string("8aTQVFaRoWcJjSrfUWGNhWxyl4H+gmCjrDT9k9CLVmm9OnpUALJH6sPZWbA1xKKrPOrD6x93sSkxLvIrC13PCA=="),
+        modelVersionHashesVersion: PersistentStoreMetadataInteger = .integer(3),
+        persistenceFrameworkVersion: PersistentStoreMetadataInteger = .integer(1526),
+        persistenceMaximumFrameworkVersion: PersistentStoreMetadataInteger = .integer(1526),
+        storeType: PersistentStoreMetadataString = .string("SQLite"),
+        modelVersionIdentifiers: PersistentStoreMetadataStringArray = .array([""]),
+        compatibleWithRuntimeModel: Bool = true
+    ) -> PersistentStoreMetadata {
         PersistentStoreMetadata(
-            entityVersionHashes: .dictionary(storeHashes()),
+            entityVersionHashes: entityVersionHashes ?? .dictionary(storeHashes()),
+            modelVersionChecksum: modelVersionChecksum,
+            modelVersionHashesDigest: modelVersionHashesDigest,
+            modelVersionHashesVersion: modelVersionHashesVersion,
+            persistenceFrameworkVersion: persistenceFrameworkVersion,
+            persistenceMaximumFrameworkVersion: persistenceMaximumFrameworkVersion,
+            storeType: storeType,
+            modelVersionIdentifiers: modelVersionIdentifiers,
             isCompatibleWithRuntimeModel: compatibleWithRuntimeModel
         )
     }
 
     private func storeHashes() -> [String: PersistentStoreMetadataValue] {
-        supportedIdentity.runtimeEntityVersionHashesByName.mapValues(PersistentStoreMetadataValue.data)
+        [
+            "CloudRecording": .data(Data(base64Encoded: "wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ=")!),
+            "DatabaseProperty": .data(Data(base64Encoded: "DdeyItMrmgzYUVyA8NUAc8cS1Sr4LwwTo+KneZZrPBI=")!),
+            "EntityRevision": .data(Data(base64Encoded: "MCYSLwlQNrzkytEuk0Paa2vv7h+rbxnn3DWtIuHpxa0=")!),
+            "Folder": .data(Data(base64Encoded: "BTuJxZB4F1ci2UMqAPo0Fx2Oif08rXM0z+/UQoivHc0=")!),
+            "Migration": .data(Data(base64Encoded: "C9+RC8Owb0OTnIogkfdqVeaZV1hChUC6VuqvEwC0DUU=")!),
+            "Recording": .data(Data(base64Encoded: "l+6Nf+h4pgpvs9n/EqyKB5n5y0F2UwNh6/6d/evM+L8=")!),
+        ]
     }
 }
 
