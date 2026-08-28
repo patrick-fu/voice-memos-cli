@@ -31,6 +31,40 @@ final class MutationAuthorizationTests: XCTestCase {
         XCTAssertEqual(fixture.accessibility.postconditionCount, 1)
     }
 
+    func testDryRunWaitsUntilInFlightExecuteReleasesSerializationBoundary() throws {
+        let fixture = makeFixture()
+        let request = renameRequest(title: "Renamed")
+        let plan = try fixture.port.dryRun(request)
+        let performStarted = DispatchSemaphore(value: 0)
+        let releasePerform = DispatchSemaphore(value: 0)
+        fixture.accessibility.performStarted = performStarted
+        fixture.accessibility.releasePerform = releasePerform
+
+        let executeFinished = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            defer { executeFinished.signal() }
+            _ = try? fixture.port.execute(
+                request,
+                authorization: MutationAuthorization(token: plan.confirmationToken, confirmed: true)
+            )
+        }
+        XCTAssertEqual(performStarted.wait(timeout: .now() + 1), .success)
+
+        let dryRunFinished = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            _ = try? fixture.port.dryRun(request)
+            dryRunFinished.signal()
+        }
+
+        XCTAssertEqual(fixture.accessibility.verificationCount, 2)
+        XCTAssertEqual(dryRunFinished.wait(timeout: .now() + 0.1), .timedOut)
+
+        releasePerform.signal()
+        XCTAssertEqual(executeFinished.wait(timeout: .now() + 1), .success)
+        XCTAssertEqual(dryRunFinished.wait(timeout: .now() + 1), .success)
+        XCTAssertEqual(fixture.accessibility.verificationCount, 3)
+    }
+
     func testDeleteUsesOnlyMoveToRecentlyDeleted() throws {
         let fixture = makeFixture()
         let request = MutationRequest(id: RecordingID(value: "recording:fixture"), operation: .moveToRecentlyDeleted)
@@ -334,6 +368,8 @@ private final class FakeAccessibilityClient: AccessibilityClient, @unchecked Sen
     private(set) var pressCount = 0
     private(set) var postconditionCount = 0
     private(set) var performedOperations: [String] = []
+    var performStarted: DispatchSemaphore?
+    var releasePerform: DispatchSemaphore?
 
     init(state: State) {
         self.state = state
@@ -367,6 +403,10 @@ private final class FakeAccessibilityClient: AccessibilityClient, @unchecked Sen
     func perform(_ request: MutationRequest) throws {
         pressCount += 1
         performedOperations.append(request.operation.description)
+        performStarted?.signal()
+        if let releasePerform {
+            _ = releasePerform.wait(timeout: .now() + 1)
+        }
         if state == .pressTimeout {
             throw AccessibilityClientError.timeout
         }

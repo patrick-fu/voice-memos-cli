@@ -130,7 +130,7 @@ struct MutationAuthorization: Sendable {
     let token: String
     let confirmed: Bool
 
-    init(token: String, confirmed: Bool = true) {
+    init(token: String, confirmed: Bool) {
         self.token = token
         self.confirmed = confirmed
     }

@@ -162,6 +162,9 @@ final class MutationAuthorizingWritePort: RecordingWritePort, @unchecked Sendabl
     }
 
     func dryRun(_ request: MutationRequest) throws -> MutationPlan {
+        executionLock.lock()
+        defer { executionLock.unlock() }
+
         let verification: AccessibilityVerification
         do {
             verification = try accessibility.verifyTarget(request)
