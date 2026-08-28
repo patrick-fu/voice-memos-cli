@@ -41,6 +41,62 @@ protocol RecordingAssetPort: Sendable {
     func export(id: RecordingID, destination: String) throws -> ExportReceipt
 }
 
+protocol RecordingAssetReferenceResolver: Sendable {
+    func assetReference(for id: RecordingID) throws -> String?
+}
+
+enum RecordingAssetError: Error, Equatable, Sendable {
+    case assetUnavailable
+    case pathOutsideRecordingsRoot
+    case notRegularFile
+    case unsupportedAssetFormat
+    case destinationExists
+    case destinationUnavailable
+    case exportInconsistent
+    case cleanupFailed
+    case accessDeniedUnattributed
+
+    var code: String {
+        switch self {
+        case .assetUnavailable: "asset_unavailable"
+        case .pathOutsideRecordingsRoot: "path_outside_recordings_root"
+        case .notRegularFile: "not_regular_file"
+        case .unsupportedAssetFormat: "unsupported_asset_format"
+        case .destinationExists: "destination_exists"
+        case .destinationUnavailable: "destination_unavailable"
+        case .exportInconsistent: "export_inconsistent"
+        case .cleanupFailed: "export_cleanup_failed"
+        case .accessDeniedUnattributed: "access_denied_unattributed"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .assetUnavailable: "The recording asset is not available locally."
+        case .pathOutsideRecordingsRoot: "The recording asset path is outside the recordings root."
+        case .notRegularFile: "The recording asset is not a regular file."
+        case .unsupportedAssetFormat: "The recording asset format is not supported."
+        case .destinationExists: "The export destination already exists."
+        case .destinationUnavailable: "The export destination is not available."
+        case .exportInconsistent: "The recording asset changed during export."
+        case .cleanupFailed: "A partial export could not be removed."
+        case .accessDeniedUnattributed: "Access to the recording asset or destination was denied."
+        }
+    }
+
+    var exitCode: Int32 {
+        switch self {
+        case .destinationExists, .destinationUnavailable:
+            ProcessExit.operationalFailure.rawValue
+        case .assetUnavailable, .pathOutsideRecordingsRoot, .notRegularFile,
+             .unsupportedAssetFormat, .exportInconsistent, .accessDeniedUnattributed:
+            ProcessExit.safetyFailure.rawValue
+        case .cleanupFailed:
+            ProcessExit.safetyFailure.rawValue
+        }
+    }
+}
+
 protocol RecordingWritePort: Sendable {
     func dryRun(_ request: MutationRequest) throws -> MutationPlan
     func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult

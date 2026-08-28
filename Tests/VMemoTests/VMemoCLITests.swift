@@ -213,6 +213,24 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual((try decodeJSON(notFound.stderr)["error"] as? [String: Any])?["code"] as? String, "recording_not_found")
     }
 
+    func testAssetErrorsUseStableCommandFailures() throws {
+        let result = CommandRunner(
+            read: FixtureReadPort(recordings: [], calls: CallLog()),
+            asset: FailingAssetPort(error: .pathOutsideRecordingsRoot),
+            write: FixtureWritePort(calls: CallLog())
+        ).run(
+            .export(id: RecordingID(value: "recording:fixture"), destination: "/tmp/export.m4a"),
+            output: .json
+        )
+
+        XCTAssertEqual(result.exitCode, ProcessExit.safetyFailure.rawValue)
+        XCTAssertEqual(result.stdout, "")
+        XCTAssertEqual(
+            (try decodeJSON(result.stderr)["error"] as? [String: Any])?["code"] as? String,
+            "path_outside_recordings_root"
+        )
+    }
+
     private func runVMemo(_ arguments: String...) throws -> ProcessResult {
         let binaryDirectory = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
         let process = Process()
@@ -289,6 +307,14 @@ private struct FailingReadPort: RecordingReadPort {
     func list() throws -> [RecordingSummary] { throw FixtureError.failed }
     func search(query: String) throws -> [RecordingSummary] { throw FixtureError.failed }
     func show(id: RecordingID) throws -> RecordingSummary { throw FixtureError.failed }
+}
+
+private struct FailingAssetPort: RecordingAssetPort {
+    let error: RecordingAssetError
+
+    func export(id: RecordingID, destination: String) throws -> ExportReceipt {
+        throw error
+    }
 }
 
 private struct SchemaFailingReadPort: RecordingReadPort {
