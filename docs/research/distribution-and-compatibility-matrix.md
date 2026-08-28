@@ -260,15 +260,14 @@ Apple 私钥泄露、notarytool 拒绝、staple/spctl 失败、checksum 不一�
 - [ ] PKG/cask、ZIP 辅助、formula source build 分别在 15/26、Intel/Apple silicon 上做 TCC/doctor 验收；报告路径变化和重新授权结果。
 - [ ] Release notes 明确：source formula 是 unsigned local build；签名公证不授 FDA/AX/Automation。
 
-## 9. 需要 Patrick 决策的最小选项
+## 9. 已确认的 v0.1 分发决策
 
-只需确认三项：
+1. **Homebrew 正式渠道：**维护 own tap，以 cask 安装与直链下载完全相同的 signed/stapled PKG。source formula 只作为开发者/次要路径。
+2. **部署下限：**`macOS 15.0`，覆盖当前 major Tahoe 26 与前一 major Sequoia 15；发布前必须完成对应架构与系统矩阵验证。
+3. **正式发布门槛：**公开 PKG 必须同时满足 Developer ID Application payload、Developer ID Installer、Hardened Runtime、secure timestamp、notarization、stapling、checksum 与 immutable GitHub Release。可选 ZIP 只标 online-ticket 辅助下载，不进入 offline 安装承诺。
+4. **开源许可：**MIT。
 
-1. **Homebrew 正式渠道：**A（推荐：own-tap cask 安装 signed PKG）还是 B（仅直链 signed PKG，不维护 cask）；source formula 始终保留为开发者/次要路径。
-2. **部署下限：**`macOS 15.0`（推荐，覆盖整个前一 major）还是 `15.6`（缩小旧 minor 范围，减少实机兼容面）。
-3. **正式发布门槛：**是否强制公开 PKG 同时满足 Developer ID Application payload、Developer ID Installer、Hardened Runtime、secure timestamp、notarization、stapling、checksum 与 immutable GitHub Release；推荐“是”。可选 ZIP 只标 online-ticket 辅助下载，不进入 offline 安装承诺。
-
-未作上述选择前，不应创建 tap、上传 release、生成签名产物或读取任何 Apple/GitHub 凭据。
+这些是 release contract，不授权当前规划阶段创建 tap、上传 release、生成签名产物或读取 Apple/GitHub 凭据；实际发布要等实现、测试和 release gate 全部就绪。
 
 ## 参考资料
 

@@ -12,6 +12,8 @@ The canonical roadmap is [Plan a safe, agent-friendly macOS Voice Memos CLI](htt
 
 Current research found no supported direct Voice Memos data API or transcript write-back interface. Direct private-store mutation is excluded; supported UI/Share paths and opt-in Shortcuts helpers are evaluated separately.
 
+The release target is macOS 15.0+, distributed as a universal2 signed, notarized, and stapled PKG. The same PKG will be available through a project-owned Homebrew cask; source builds remain a secondary developer path.
+
 ## Research
 
 - [Voice Memos data access boundaries](docs/research/voice-memos-data-access.md)
@@ -22,3 +24,7 @@ Current research found no supported direct Voice Memos data API or transcript wr
 - [Test fixtures and integration isolation](docs/research/test-fixtures-and-integration-isolation.md)
 - [Transcript write-back feasibility](docs/research/voice-memos-transcript-writeback.md)
 - [Shortcuts bridge feasibility](docs/research/voice-memos-shortcuts-bridge.md)
+
+## License
+
+[MIT](LICENSE)
