@@ -15,8 +15,17 @@ let package = Package(
             name: "VMemo",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
             ]
         ),
-        .testTarget(name: "VMemoTests", dependencies: ["VMemo"]),
+        .testTarget(
+            name: "VMemoTests",
+            dependencies: ["VMemo"],
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+            ]
+        ),
     ]
 )
