@@ -195,6 +195,24 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "adapter_operation_failed")
     }
 
+    func testSchemaAdapterErrorsUseStableCommandFailures() throws {
+        let unsupported = CommandRunner(
+            read: SchemaFailingReadPort(error: .unsupportedSchema),
+            asset: FixtureAssetPort(calls: CallLog()),
+            write: FixtureWritePort(calls: CallLog())
+        ).run(.list, output: .json)
+        let notFound = CommandRunner(
+            read: SchemaFailingReadPort(error: .recordingNotFound),
+            asset: FixtureAssetPort(calls: CallLog()),
+            write: FixtureWritePort(calls: CallLog())
+        ).run(.show(id: RecordingID(value: "11111111-1111-1111-1111-111111111111")), output: .json)
+
+        XCTAssertEqual(unsupported.exitCode, ProcessExit.safetyFailure.rawValue)
+        XCTAssertEqual((try decodeJSON(unsupported.stderr)["error"] as? [String: Any])?["code"] as? String, "unsupported_schema")
+        XCTAssertEqual(notFound.exitCode, ProcessExit.operationalFailure.rawValue)
+        XCTAssertEqual((try decodeJSON(notFound.stderr)["error"] as? [String: Any])?["code"] as? String, "recording_not_found")
+    }
+
     private func runVMemo(_ arguments: String...) throws -> ProcessResult {
         let binaryDirectory = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
         let process = Process()
@@ -271,6 +289,14 @@ private struct FailingReadPort: RecordingReadPort {
     func list() throws -> [RecordingSummary] { throw FixtureError.failed }
     func search(query: String) throws -> [RecordingSummary] { throw FixtureError.failed }
     func show(id: RecordingID) throws -> RecordingSummary { throw FixtureError.failed }
+}
+
+private struct SchemaFailingReadPort: RecordingReadPort {
+    let error: SchemaAdapterError
+
+    func list() throws -> [RecordingSummary] { throw error }
+    func search(query: String) throws -> [RecordingSummary] { throw error }
+    func show(id: RecordingID) throws -> RecordingSummary { throw error }
 }
 
 private enum FixtureError: Error {

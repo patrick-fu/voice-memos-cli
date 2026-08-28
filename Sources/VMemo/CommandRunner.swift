@@ -71,6 +71,8 @@ struct CommandRunner: Sendable {
             }
         } catch let error as VMemoError {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
+        } catch let error as SchemaAdapterError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         } catch {
             return failure(
                 code: "adapter_operation_failed",
@@ -161,6 +163,9 @@ struct CommandRunner: Sendable {
     private func adapterFailure(_ error: Error, operation: String, output: OutputFormat) -> CommandResult {
         if let error = error as? VMemoError {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
+        }
+        if let error = error as? SchemaAdapterError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         }
         return failure(
             code: "adapter_operation_failed",
