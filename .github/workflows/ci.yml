@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-15
+          - macos-15-intel
+          - macos-26
+          - macos-26-intel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Print system information
+        run: |
+          uname -a
+          sw_vers
+          swift --version
+
+      - name: Run tests
+        run: swift test --parallel
+
+      - name: Build with strict concurrency
+        run: swift build -Xswiftc -strict-concurrency=complete
