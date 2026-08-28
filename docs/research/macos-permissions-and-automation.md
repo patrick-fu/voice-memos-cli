@@ -12,7 +12,7 @@
 | 能力 | 决策 | 条件 |
 | --- | --- | --- |
 | `list/search/show/export` | **Go** | 推荐用户授予 Full Disk Access（FDA）作为稳定的宽授权；schema、路径、SQLite snapshot 与资产状态全部通过 preflight。FDA 不是已证明的最小或唯一可行授权。 |
-| `rename/delete` | **Go（允许无人值守）** | 唯一写后端是原生 `AXUIElement`；无需人在电脑前，但必须是已登录、已解锁、可见且可验证的 GUI session，并满足 Accessibility、token、显式确认和逐条 pre/post verification。 |
+| `rename/delete` | **Go（允许无人值守）** | 唯一写后端是原生 `AXUIElement`；无需人在电脑前，也不把锁屏、SSH 或后台标签本身当作拒绝条件。实际 UI 必须可达且可验证，并满足 Accessibility、token、显式确认和逐条 pre/post verification。 |
 | 打开 Voice Memos、人工操作 | **Go（辅助路径）** | 可用于用户自行完成操作，但不是 `rename/delete` 命令的替代后端。 |
 | System Events/JXA UI scripting | **No-Go（默认实现）** | 它增加 Apple Events/Automation 面；尚无证据证明它能免除 Accessibility。仅可作为单独、后续实验证明的兼容后备。 |
 | 直接改 Voice Memos SQLite、资源或 CloudKit mirror | **No-Go** | FDA 只解决文件可读性，不提供 Core Data、`voicememod`、CloudKit 或 Recently Deleted 的一致性契约。 |
@@ -22,14 +22,14 @@
 
 `list`、`search`、`show`、`export`、`rename` 和 `delete` 都是 v0.1 的正常命令；权限、preflight 或确认不满足时返回明确错误，而不是把命令隐藏或改名。
 
-无人值守不等于后台或 headless：本地 Agent 可以在已解锁的交互式 GUI session 中执行 token-confirmed mutation；锁屏、无 GUI login、SSH、CI、LaunchDaemon 和不可验证的后台 session 一律 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
+本地 Agent 可以无人值守执行 token-confirmed mutation。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。任何一步不可验证才 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
 
 ## 权限矩阵
 
 | 路径 | 最小权限/机制 | 授权主体与运行约束 | 失败关闭策略 |
 | --- | --- | --- | --- |
 | 读取 Voice Memos app/group container、SQLite snapshot、已本地化 asset | **推荐 FDA（`SystemPolicyAllFiles`）** 作为稳定宽授权；也可能受 `SystemPolicyAppData`、POSIX ACL、MAC/SIP/容器保护、iCloud 占位和文件锁限制 | Apple 明示 FDA 必须由用户在系统设置授予，不能用 entitlement 或代码自动取得；FDA 可访问其他 app 的数据。它不是本研究证明的最小或唯一授权。当前系统的 Voice Memos 是 sandboxed，且拥有自己的 app group/私有 storage entitlement。 | 任何 `EACCES`/`EPERM`、未知路径/schema、snapshot 不一致、源变动或 asset 未下载：不读、不降级为写入，返回可操作诊断；不要把错误精确归因为某一个 TCC service。 |
-| 原生 `AXUIElement` 读取/按压 Voice Memos UI | **Accessibility**，调用 `AXIsProcessTrustedWithOptions` 检查当前进程 | API 返回的是“当前进程”是否为 trusted accessibility client；提醒可异步显示，返回值不会等待授权。`rename/delete` 只支持已登录、已解锁、可见且可验证的 GUI session；锁屏、SSH、launchd/headless 不支持。 | 不受信任、找不到目标 PID/window、元素歧义、`kAXErrorCannotComplete`、超时或 UI 状态改变：不重试，不猜测元素 index，返回机器可读 `mutation_preflight_failed`。 |
+| 原生 `AXUIElement` 读取/按压 Voice Memos UI | **Accessibility**，调用 `AXIsProcessTrustedWithOptions` 检查当前进程 | API 返回的是“当前进程”是否为 trusted accessibility client；提醒可异步显示，返回值不会等待授权。CLI 运行时验证目标 app、窗口、元素和焦点，不按锁屏、SSH、launchd/headless 标签建立静态 allowlist 或 denylist。 | 不受信任、找不到目标 PID/window、元素歧义、`kAXErrorCannotComplete`、超时或 UI 状态改变：不重试，不猜测元素 index，返回机器可读 `mutation_preflight_failed`。 |
 | 外部 `/usr/bin/osascript`（JXA/AppleScript）→ System Events | **Apple Events/Automation**；System Events 是否还依赖 Accessibility 待实测 | 实际 Apple Event sender 是外部 `osascript` 进程；本 CLI 的 `Info.plist`/entitlement 不会自动附着到它。TCC 归属、System Events/调用方的 Accessibility 需要单独实测。 | Automation 拒绝、System Events/Voice Memos 未响应或 UI 不匹配：停在人工操作，不回退到 AX 或私有 store 写入。 |
 | 内嵌 OSA 或本 CLI 直接 Apple Event API → System Events | **Apple Events/Automation**；System Events 的 Accessibility 依赖待实测 | 发件者是本 CLI/其 app host。若该发件者作为 app 使用发送 Apple Events API，须提供 `NSAppleEventsUsageDescription`；Hardened Runtime app 还须有 `com.apple.security.automation.apple-events` 才能提示。 | Automation 拒绝、usage string/entitlement 缺失、System Events/Voice Memos 未响应或 UI 不匹配：停在人工操作，不回退到 AX 或私有 store 写入。 |
 | 启动 Voice Memos、人工操作 | 无额外 CLI automation 权限 | 仅交互式；用户决定是否继续。 | 打不开、前台状态不确定或用户取消：返回取消，不模拟点击。 |
@@ -72,7 +72,7 @@
 
 **推论：**AX mutation 的实际对象是正在运行的 Voice Memos UI，因而前台窗口、焦点、modal sheet、语言、窗口层级和目标元素唯一性都是操作前条件，而不是 UI 细节。`AXUIElementCreateApplication(pid)` 的存在只证明可按 PID 建立入口，不保证元素可见、可操作或语义正确。
 
-Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或后台 LaunchAgent 能可靠完成目标 UI 操作。v0.1 明确不支持这些模式；只有**已解锁、有人登录、可见 GUI、Voice Memos 前台**的 session 才能进入 mutation preflight。无需人在电脑前持续监督，但 `kAXErrorCannotComplete`、目标 app 无响应、窗口/元素缺失、焦点漂移或超时都视为不可安全完成。
+Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或后台 LaunchAgent 能可靠完成目标 UI 操作；这意味着它们不能获得静态成功承诺，不意味着 CLI 必须在 preflight 前按标签拒绝。v0.1 直接尝试建立可验证的 Voice Memos UI 状态：能唯一定位并完成 fresh pre/post verification 就允许无人值守执行；`kAXErrorCannotComplete`、目标 app 无响应、窗口/元素缺失、焦点漂移或超时才视为不可安全完成。
 
 ## 为什么不用 System Events/JXA 作为默认
 
@@ -110,7 +110,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 4. batch 接受批量输入，但严格串行执行；每条都独立消费 token、完成 fresh pre/post verification。任一歧义、焦点漂移、权限变化、超时或 post-verification 失败立即停止后续项目，并以机器可读 partial result（至少含 `status: "partial"`、`completed`、`failed`、`notAttempted` 和稳定错误码）返回；不得并行或继续猜测。
 5. `delete` 只按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted。Permanent Delete、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令不得调用或模拟这些 UI action。
 
-**已决定：**满足上述 token、显式确认、交互式 GUI session 和串行验证条件后，允许非交互或无人值守调用。JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
+**已决定：**满足上述 token、显式确认、可验证 UI 状态和串行验证条件后，允许非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
 
 ## Doctor、拒绝处理与失败关闭
 
@@ -154,7 +154,7 @@ standalone executable 是否可由 `tccutil` 的 identity 参数精确匹配仍�
 | `-wal`/`-shm` 均不存在、任一存在、source handle 的协调 sidecar 行为 | 默认 `sqlite3_backup` 不手工复制 sidecar；两者均不存在按 clean-close 正常读取。仅人工 quiescent fallback 复制 DB+WAL、不复制 live `-shm`，由副本 SQLite 重建；source handle sidecar 行为须在隔离环境验证后才形成政策。 |
 | Accessibility 首次、Allow、Deny、设置中撤销、`tccutil reset Accessibility` 后 | `AXIsProcessTrustedWithOptions(nil)` 与命令结果一致；prompt 异步，不把一次调用视为授权完成。 |
 | 实际 CLI 直接运行、Terminal、Homebrew 安装、LaunchAgent、SSH | 分别记录 actual process identity 和 AX 结果；未证实的模式均不进入支持矩阵。 |
-| 已解锁前台、锁屏、无 GUI login、Voice Memos 未运行/有 modal/无响应 | 仅已解锁、可见、可验证的 GUI session 可在无人监督时通过完整 token + fresh pre/post verification；其余场景不支持并安全停止，不尝试唤醒、解锁或隐式交互。 |
+| 前台、锁屏、无 GUI login、Voice Memos 未运行/有 modal/无响应 | 不按 session 标签预先判定；逐项运行 UI 可达性与完整 token + fresh pre/post verification。能证明目标与结果才执行，否则安全停止，不尝试唤醒、解锁或绕过系统边界。 |
 | System Events/JXA（若以后实现）Automation Allow/Deny/reset | 验证调用者 identity、usage string、entitlement、System Events/AX 归属和取消码；结果不满足可机器判定即移除 backend。 |
 | AX rename/delete 单条、同名/排序变更/语言变更/UI 改版 | 操作前后按 token 绑定的受验证属性重新定位；显式确认后，歧义、元素变化、结果不可核验均停止。删除只验证原生 Recently Deleted UI 语义；Permanent Delete 不在 scope 内。 |
 | AX rename/delete batch | 输入可含多项；严格串行，每条都 fresh pre/post verification。首个歧义/焦点漂移/失败后停止，JSON 返回 stable-code partial result。 |
