@@ -22,6 +22,7 @@ The release target is macOS 15.0+, distributed as a universal2 signed, notarized
 
 - [Voice Memos data access boundaries](docs/research/voice-memos-data-access.md)
 - [Private API and community implementation survey](docs/research/private-api-community-survey.md)
+- [Community implementation patterns](docs/research/community-implementation-patterns.md)
 - [Mutation backends beyond input synthesis](docs/research/voice-memos-mutation-alternatives.md)
 - [macOS permission and automation constraints](docs/research/macos-permissions-and-automation.md)
 - [SQLite snapshot and concurrency strategy](docs/research/sqlite-snapshot-strategy.md)
