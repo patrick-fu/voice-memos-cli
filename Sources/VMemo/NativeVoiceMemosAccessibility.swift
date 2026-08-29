@@ -355,7 +355,10 @@ private struct ApplicationServicesVoiceMemosAXRuntime: VoiceMemosAXRuntime {
             let actions = unsafeDowncast(value, to: NSArray.self)
             var names: [String] = []
             for index in 0..<actions.count {
-                if let name = actions[index] as? String { names.append(name) }
+                guard let name = actions[index] as? String else {
+                    throw VoiceMemosAccessibilityError.uiTreeUnsupported
+                }
+                names.append(name)
             }
             return names
         case .cannotComplete:
@@ -514,7 +517,36 @@ private struct VoiceMemosAXRecognizedRow {
     let node: VoiceMemosAXRecognizedNode
     let title: String
     let duration: String
-    let actionNames: [String]
+    let actions: [VoiceMemosAXActionToken]
+}
+
+/// Voice Memos returns custom AX action names as opaque, multi-line tokens.  Their
+/// localized `Name:` field is useful for recognition only; invoking a custom action
+/// must always use the complete token returned by the current AX tree.
+private enum VoiceMemosAXActionToken {
+    case press
+    case custom(label: String, raw: String)
+
+    static func parse(_ raw: String) -> VoiceMemosAXActionToken? {
+        guard !raw.utf8.contains(0) else { return nil }
+        if raw == VoiceMemosAXManifest.pressAction {
+            return .press
+        }
+        let firstLine = raw.split(
+            separator: "\n",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        ).first ?? ""
+        guard firstLine.hasPrefix("Name:") else { return nil }
+        let label = String(firstLine.dropFirst("Name:".count))
+        guard !label.utf8.isEmpty else { return nil }
+        return .custom(label: label, raw: raw)
+    }
+
+    var semanticLabel: String? {
+        guard case let .custom(label, _) = self else { return nil }
+        return label
+    }
 }
 
 private struct VoiceMemosAXRecognizedTree {
@@ -570,11 +602,13 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
                 VoiceMemosAXRow(
                     title: row.title,
                     isVisible: row.node.attributes.isVisible == true,
-                    hasNativeDeleteAction: row.actionNames.contains(
-                        VoiceMemosAXManifest.deleteAction
+                    hasNativeDeleteAction: hasCustomAction(
+                        VoiceMemosAXManifest.deleteAction,
+                        on: row
                     ),
-                    hasRestoreAction: row.actionNames.contains(
-                        VoiceMemosAXManifest.restoreAction
+                    hasRestoreAction: hasCustomAction(
+                        VoiceMemosAXManifest.restoreAction,
+                        on: row
                     )
                 )
             },
@@ -593,7 +627,7 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
             try runtime.performAction(VoiceMemosAXManifest.pressAction, on: sidebar.handle)
         case let .selectRecording(scope, title):
             let row = try requireRow(title: title, scope: scope)
-            try requireRowAction(VoiceMemosAXManifest.pressAction, on: row)
+            try requirePressAction(on: row)
             try runtime.performAction(VoiceMemosAXManifest.pressAction, on: row.node.handle)
         case let .setDetailTitle(title):
             let tree = try recognizeCurrentApplication()
@@ -613,7 +647,7 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
                 throw VoiceMemosAccessibilityError.allRecordingsRequired(selected: scope)
             }
             let row = try requireRow(title: title, scope: .allRecordings)
-            try requireNativeDeleteAction(on: row, title: title)
+            _ = try requireNativeDeleteAction(on: row, title: title)
             let freshTree = try recognizeCurrentApplication()
             guard freshTree.selectedSidebar == .allRecordings else {
                 throw VoiceMemosAccessibilityError.allRecordingsRequired(
@@ -624,9 +658,9 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
             guard runtime.isSameElement(freshRow.node.handle, row.node.handle) else {
                 throw VoiceMemosAccessibilityError.uiTreeUnsupported
             }
-            try requireNativeDeleteAction(on: freshRow, title: title)
+            let deleteToken = try requireNativeDeleteAction(on: freshRow, title: title)
             try runtime.performAction(
-                VoiceMemosAXManifest.deleteAction,
+                deleteToken,
                 on: freshRow.node.handle
             )
         }
@@ -688,24 +722,32 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
         return row
     }
 
-    private func requireRowAction(
-        _ action: String,
+    private func requirePressAction(
         on row: VoiceMemosAXRecognizedRow
     ) throws {
-        guard row.actionNames.contains(action) else {
-            throw VoiceMemosAccessibilityError.unknownAction(action)
+        guard row.actions.contains(where: { if case .press = $0 { return true }; return false }) else {
+            throw VoiceMemosAccessibilityError.unknownAction(
+                VoiceMemosAXManifest.pressAction
+            )
         }
     }
 
     private func requireNativeDeleteAction(
         on row: VoiceMemosAXRecognizedRow,
         title: String
-    ) throws {
-        guard row.actionNames.contains(VoiceMemosAXManifest.deleteAction),
-              !row.actionNames.contains(VoiceMemosAXManifest.restoreAction)
+    ) throws -> String {
+        let matchingTokens = row.actions.compactMap { token -> String? in
+            guard case let .custom(label, raw) = token,
+                  label == VoiceMemosAXManifest.deleteAction
+            else { return nil }
+            return raw
+        }
+        guard matchingTokens.count == 1,
+              !hasCustomAction(VoiceMemosAXManifest.restoreAction, on: row)
         else {
             throw VoiceMemosAccessibilityError.deleteActionMissing(title: title)
         }
+        return matchingTokens[0]
     }
 
     private func recognize(
@@ -854,9 +896,22 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
             ? VoiceMemosAXManifest.restoreAction
             : VoiceMemosAXManifest.deleteAction
         let actionNames = try runtime.actionNames(of: row.handle)
-        let actions = Set(actionNames)
-        guard actions == [VoiceMemosAXManifest.pressAction, requiredAction],
-              !actions.contains(forbiddenAction),
+        let actions = try actionNames.map { rawAction -> VoiceMemosAXActionToken in
+            guard let token = VoiceMemosAXActionToken.parse(rawAction) else {
+                throw VoiceMemosAccessibilityError.uiTreeUnsupported
+            }
+            return token
+        }
+        let customLabels = actions.compactMap(\.semanticLabel)
+        let pressCount = actions.reduce(into: 0) { count, action in
+            if case .press = action { count += 1 }
+        }
+        guard actions.count == 2,
+              pressCount == 1,
+              customLabels.count == 1,
+              Set(customLabels).count == customLabels.count,
+              customLabels[0] == requiredAction,
+              customLabels[0] != forbiddenAction,
               let duration = row.attributes.value,
               !duration.utf8.isEmpty,
               row.attributes.isSelected != nil,
@@ -870,8 +925,15 @@ struct SystemVoiceMemosAXDriver: VoiceMemosAXDriver {
             node: row,
             title: title,
             duration: duration,
-            actionNames: actionNames
+            actions: actions
         )
+    }
+
+    private func hasCustomAction(
+        _ label: String,
+        on row: VoiceMemosAXRecognizedRow
+    ) -> Bool {
+        row.actions.contains { $0.semanticLabel == label }
     }
 
     private func parseRowDescription(

@@ -74,7 +74,10 @@ final class NativeVoiceMemosAccessibilityTests: XCTestCase {
         try deleteAccessibility.delete(delete)
         try deleteAccessibility.verifyPostcondition(delete)
 
-        XCTAssertEqual(deleteRuntime.recordedActions().map(\.action), ["删除", "AXPress"])
+        XCTAssertEqual(deleteRuntime.recordedActions().map(\.action), [
+            rawAction("删除"),
+            "AXPress",
+        ])
         XCTAssertEqual(deleteRuntime.recordedActions().map(\.elementID), ["target-row", "recent"])
         XCTAssertEqual(try deleteDriver.snapshot().selectedSidebar, .recentlyDeleted)
         XCTAssertEqual(try deleteDriver.snapshot().rows, [
@@ -102,7 +105,7 @@ final class NativeVoiceMemosAccessibilityTests: XCTestCase {
                     $0.actions = ["AXPress"]
                 }
             }, .uiTreeUnsupported),
-            ("unknown row action", { runtime in
+            ("malformed custom action", { runtime in
                 runtime.mutateNode("target-row") { $0.actions = ["AXPress", "未知操作"] }
             }, .uiTreeUnsupported),
             ("virtualized row shape", { runtime in
@@ -111,8 +114,14 @@ final class NativeVoiceMemosAccessibilityTests: XCTestCase {
             ("detail not settable", { runtime in
                 runtime.mutateNode("title-field") { $0.isSettable = false }
             }, .detailTitleNotSettable),
-            ("permanent action visible", { runtime in
-                runtime.mutateNode("target-row") { $0.actions = ["AXPress", "永久删除"] }
+            ("permanent delete action visible", { runtime in
+                runtime.mutateNode("target-row") { $0.actions = ["AXPress", rawAction("永久删除")] }
+            }, .uiTreeUnsupported),
+            ("delete all action visible", { runtime in
+                runtime.mutateNode("target-row") { $0.actions = ["AXPress", rawAction("全部删除")] }
+            }, .uiTreeUnsupported),
+            ("empty recently deleted action visible", { runtime in
+                runtime.mutateNode("target-row") { $0.actions = ["AXPress", rawAction("清空最近删除")] }
             }, .uiTreeUnsupported),
         ]
 
@@ -182,6 +191,48 @@ final class NativeVoiceMemosAccessibilityTests: XCTestCase {
             )
         }
         XCTAssertTrue(runtime.recordedActions().isEmpty)
+    }
+
+    func testLiveDriverParsesOnlyCompleteRawCustomActionTokens() throws {
+        let malformedActions = [
+            "",
+            "删除",
+            "Name:\nTarget:0x0\nSelector:(null)",
+            "name:删除\nTarget:0x0\nSelector:(null)",
+            "Name:删除\0\nTarget:0x0\nSelector:(null)",
+        ]
+        for action in malformedActions {
+            let runtime = FakeVoiceMemosAXRuntime()
+            runtime.mutateNode("target-row") { $0.actions = ["AXPress", action] }
+
+            XCTAssertThrowsError(try SystemVoiceMemosAXDriver(runtime: runtime).snapshot()) { error in
+                XCTAssertEqual(error as? VoiceMemosAccessibilityError, .uiTreeUnsupported)
+            }
+            XCTAssertTrue(runtime.recordedActions().isEmpty)
+        }
+    }
+
+    func testLiveDriverRejectsDuplicateCustomLabelsAndExecutesCurrentRawToken() throws {
+        let rawDelete = "Name:删除\nTarget:0x0\nSelector:(null)\nOpaque:測試"
+        let duplicateRuntime = FakeVoiceMemosAXRuntime()
+        duplicateRuntime.mutateNode("target-row") {
+            $0.actions = ["AXPress", rawDelete, rawAction("删除")]
+        }
+        XCTAssertThrowsError(try SystemVoiceMemosAXDriver(runtime: duplicateRuntime).snapshot()) { error in
+            XCTAssertEqual(error as? VoiceMemosAccessibilityError, .uiTreeUnsupported)
+        }
+        XCTAssertTrue(duplicateRuntime.recordedActions().isEmpty)
+
+        let runtime = FakeVoiceMemosAXRuntime()
+        runtime.mutateNode("target-row") { $0.actions = ["AXPress", rawDelete] }
+        let driver = SystemVoiceMemosAXDriver(runtime: runtime)
+
+        let snapshot = try driver.snapshot()
+        XCTAssertTrue(snapshot.rows[1].hasNativeDeleteAction)
+        try driver.perform(.activateDelete(scope: .allRecordings, title: "Old exact title"))
+        XCTAssertEqual(runtime.recordedActions().map(\.action), [rawDelete])
+        XCTAssertEqual(runtime.recordedActions().map(\.elementID), ["target-row"])
+        XCTAssertNotEqual(runtime.recordedActions().first?.action, "删除")
     }
 
     func testRenameSelectsExactTargetSetsExactTitleThenSelectsDistinctCommitSink() throws {
@@ -767,6 +818,21 @@ private func productionSource() throws -> String {
         .appendingPathComponent("Sources/VMemo/NativeVoiceMemosAccessibility.swift"), encoding: .utf8)
 }
 
+private func rawAction(_ label: String) -> String {
+    "Name:\(label)\nTarget:0x0\nSelector:(null)"
+}
+
+private func fixtureActionLabel(_ raw: String) -> String? {
+    let firstLine = raw.split(
+        separator: "\n",
+        maxSplits: 1,
+        omittingEmptySubsequences: false
+    ).first ?? ""
+    guard firstLine.hasPrefix("Name:") else { return nil }
+    let label = String(firstLine.dropFirst("Name:".count))
+    return label.utf8.isEmpty ? nil : label
+}
+
 private func snapshot(_ mutate: (inout VoiceMemosAXSnapshot) -> Void = { _ in }) -> VoiceMemosAXSnapshot {
     var value = VoiceMemosAXSnapshot.readyForRename
     mutate(&value)
@@ -883,7 +949,7 @@ private final class FakeVoiceMemosAXRuntime: VoiceMemosAXRuntime, @unchecked Sen
                 descriptionText: "Commit sink · 2026-08-29 20:00",
                 isSelected: false,
                 isVisible: true,
-                actions: ["AXPress", "删除"]
+                actions: ["AXPress", rawAction("删除")]
             ),
             "target-row": FakeAXNode(
                 role: "AXRow",
@@ -891,7 +957,7 @@ private final class FakeVoiceMemosAXRuntime: VoiceMemosAXRuntime, @unchecked Sen
                 descriptionText: "Old exact title · 2026-08-29 20:01",
                 isSelected: true,
                 isVisible: true,
-                actions: ["AXPress", "删除"]
+                actions: ["AXPress", rawAction("删除")]
             ),
             "detail": FakeAXNode(role: "AXGroup", children: ["title-field"]),
             "title-field": FakeAXNode(
@@ -1082,7 +1148,8 @@ private final class FakeVoiceMemosAXRuntime: VoiceMemosAXRuntime, @unchecked Sen
             nodes[rowID]?.isSelected = true
             let selectedTitle = nodes[rowID].flatMap { rowTitle(from: rowID, node: $0) }
             nodes["title-field"]?.value = selectedTitle
-        case ("删除", let rowID) where nodes[rowID]?.role == "AXRow":
+        case (let action, let rowID)
+            where fixtureActionLabel(action) == "删除" && nodes[rowID]?.role == "AXRow":
             nodes[rowID] = nil
             if selectedRowID == rowID {
                 selectedRowID = nil
@@ -1105,7 +1172,7 @@ private final class FakeVoiceMemosAXRuntime: VoiceMemosAXRuntime, @unchecked Sen
                 descriptionText: "Old exact title · 2026-08-29 20:01",
                 isSelected: false,
                 isVisible: true,
-                actions: ["AXPress", "恢复"]
+                actions: ["AXPress", rawAction("恢复")]
             )
             nodes["recordings"]?.children = ["recent-target-row"]
             nodes["title-field"]?.value = nil
