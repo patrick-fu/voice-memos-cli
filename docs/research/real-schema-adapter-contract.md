@@ -185,7 +185,7 @@ Apple 用户指南确认 Voice Memos 的删除先进入 Recently Deleted，且�
 
 **Community code behavior：** 公开的 [harryf implementation](https://github.com/harryf/voice-memos/blob/7e38eda5e50d537e933dd67a4a3aeec473a90444/Sources/voice-memos/Database.swift#L64-L107) 动态取得列后按 `ZDATE` 排序；[polarity implementation](https://github.com/polarity-dev/macos-voice-memos-export/blob/1f6e70ffe7048a8d4fa12a8696626a1abc2367c1/Sources/Broker/VoiceMemosStore.swift#L9-L39) 要求 `ZPATH`。均没有可靠的 deleted/Recently Deleted predicate。未找到固定源码证明任何 `ZFLAGS` bit、`ZEVICTIONDATE IS NULL`、`ZFOLDER IS NULL`、`ZPATH IS NOT NULL` 或 duration 阈值意味着 Active。
 
-**结论：** 这些 predicate 全部禁止；delete、restore 及 active/Recently Deleted/cloud placeholder/evicted 的 state predicate 尚未验证，production read/mutation 仍 blocked：
+**结论（round-trip 前）：** 下列启发式 predicate 全部禁止；delete、restore 及 active/Recently Deleted/cloud placeholder/evicted 的 state 语义当时未验证，production read/mutation 保持 blocked：
 
 ```sql
 ZFLAGS = 0
@@ -196,6 +196,8 @@ ZDURATION >= <threshold>
 ```
 
 它们目前只能是将来 disposable validation 的候选观察，不能排除删除行/占位行，更不能把剩余行称为 Active。
+
+**Issue #26 round-trip observed fact（build 1380）：** 一次在 Recently Deleted view 对 row 执行 Delete 显示 Permanent Delete 确认；已取消且未发生永久删除。因此 delete preflight 必须先验证 All Recordings view，永久删除/全部删除永不执行。对一条 disposable 完成 Recent → restore → Active snapshot → All view delete → Recent snapshot → restore → final snapshot：完整 29 列中，Active→Recent 仅 `ZEVICTIONDATE` 从 NULL 变为 non-NULL real 值且 `Z_OPT` 改变；Recent→restored 反向；final restored 与 initial active 仅 `Z_OPT` 不同。第二条 Recent disposable 同样为 non-NULL real `ZEVICTIONDATE`。UI folder counts 每次仅发生 ±1（不记录实际 count）。当前 settings 观察到 30 days 仅作 diagnostic，不作为 predicate。故当前 build manifest 的 state rule 为：Active=`ZEVICTIONDATE IS NULL`；Recently Deleted=`ZEVICTIONDATE` 为 non-NULL real 值；`Z_OPT` 不参与判定；未知类型一律 fail closed。标题已恢复，第一条为 active，第二条未突变；临时 snapshot/probe 已永久清理。全文不记录真实 title、ID、path、timestamp、count 或 audio。
 
 ### Asset path policy
 
@@ -213,7 +215,7 @@ ZDURATION >= <threshold>
 | --- | --- | --- |
 | macOS 26 exact DDL/metadata | build 1380 的 disposable store；仅 schema/metadata，不保存 rows | 固定 `Z_METADATA` decoding、table/column declaration/affinity、model hash 与 column fingerprint 一致；届时才可在新版本 manifest 中把经复现的 physical fingerprint 提升为 gate。 |
 | Title precedence | App 创建/改名若干无敏感 sample，使三 title candidate 覆盖 NULL/不同值；比较 App UI | 当前 build 仅接受 sorting/encrypted 均 nonempty valid UTF-8 且 exact equal；mismatch/null fail closed，不定义更宽 fallback。 |
-| Active / Recently Deleted | 分别创建 active、通过 App 移到 Recently Deleted、恢复；不 permanent delete | 每个状态有稳定、可解释、跨样本一致的 *read-only* predicate；否则 list 继续 blocked。 |
+| Active / Recently Deleted | round-trip 覆盖 Active→Recent→restore→Active；All Recordings view 执行 delete；不执行 permanent/all delete | 当前 build 仅接受 Active=`ZEVICTIONDATE IS NULL`、Recently Deleted=non-NULL real `ZEVICTIONDATE`；`Z_OPT` 不参与；未知类型 fail closed。 |
 | local / evicted / iCloud placeholder | 本地 sample、离线/未下载 sample、eviction-related state（只用官方 UI/系统流程） | 资产可用性可由 path + filesystem post-check 区分；禁止仅依据 DB column 或文件大小。 |
 | `.m4a` / `.qta` export | 两种可出现的 sample、每种 asset availability | 每个被支持类型都有 FD-copy + AVFoundation/open verification；不支持者返回 `asset_unavailable` 或 `unsupported_asset_type`。 |
 | macOS 15 | 15 的 isolated user、该系统 bundle/model/store | 独立 capture 出 build/model/metadata/column fingerprint，不能从 26 或 synthetic fixture 推导。 |

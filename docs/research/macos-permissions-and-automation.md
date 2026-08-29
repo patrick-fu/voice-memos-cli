@@ -64,7 +64,9 @@
 
 在 build 1380 的两条 disposable 上，AX row 与选中的 title field 均无可用 AXIdentifier 或 opaque DB ID。row 暴露 title/time description、duration、selection 与 native custom actions；选中的 title field 可 set。对 title field 调用 `AXSetValue` 后，选择另一条唯一匹配的 disposable row 可以提交。两条样本均通过 fresh owner-only backup integrity 检查，且 backup 期间 source metadata 稳定。改名后 UI title 与 `ZCUSTOMLABELFORSORTING`、`ZENCRYPTEDTITLE` exact equal；`ZCUSTOMLABEL` 不等于新的 UI title。证据不记录真实 title、ID、path、时间或大小。
 
-**定位约束：** 不得假设 `AXIdentifier == ID`。实现必须用 opaque DB ID + 唯一、validated UI tuple 建立 fail-closed 映射；同 tuple 匹配多条即 ambiguous。delete、restore 与 state predicate 尚未验证，production read/mutation 仍 blocked。
+**定位约束：** 不得假设 `AXIdentifier == ID`。实现必须用 opaque DB ID + 唯一、validated UI tuple 建立 fail-closed 映射；同 tuple 匹配多条即 ambiguous。delete/restore UI 流程尚未获 production 授权，production read/mutation 仍 blocked；build 1380 的 state rule 见下方 round-trip 证据。
+
+**Round-trip state evidence（同一 issue，脱敏）：** 在 Recently Deleted view 对 row 执行 Delete 曾出现 Permanent Delete 确认；操作已取消且未永久删除。故 delete preflight 必须验证 All Recordings view；永久删除与全部删除永不执行。对一条 disposable 完成 Recent→restore→Active snapshot→All view delete→Recent snapshot→restore→final snapshot：完整 29 列中 Active→Recent 仅 `ZEVICTIONDATE` 由 NULL 变为 non-NULL real 值并伴随 `Z_OPT` 改变，Recent→restored 反向，final restored 与 initial active 仅 `Z_OPT` 不同；第二条 Recent disposable 也为 non-NULL real `ZEVICTIONDATE`。UI folder counts 每次仅 ±1，不记录实际 count。settings 的 30 days 仅作 diagnostic，不作为 predicate。当前 build state rule：Active=`ZEVICTIONDATE IS NULL`；Recently Deleted=`ZEVICTIONDATE` 为 non-NULL real 值；`Z_OPT` 不参与；未知类型 fail closed。标题已恢复，第一条 active，第二条未突变；临时 snapshot/probe 已永久清理。证据不记录真实 title、ID、path、timestamp、count 或 audio。
 
 ### 进程身份：必须保守处理
 
@@ -114,7 +116,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 2. mutation 必须提供该 token 和显式确认。交互模式可要求用户输入确认；`--json`/非交互模式必须显式传入确认参数，且**不得**调用 `AXIsProcessTrustedWithOptions` 的 prompt option、显示确认窗口或任何 TCC 授权 UI。权限未满足时返回机器可读拒绝，留给用户在系统设置完成授权后重试。
 3. 每条 action 都在按压前 fresh pre-verification：重新定位 Voice Memos、窗口和唯一目标，验证 token 仍匹配、焦点/模态状态符合预期；按压后做 fresh post-verification。无法证明预期状态转变即返回失败，不能以“未报错”视为成功。
 4. batch 接受批量输入，但严格串行执行；每条都独立消费 token、完成 fresh pre/post verification。任一歧义、焦点漂移、权限变化、超时或 post-verification 失败立即停止后续项目，并以机器可读 partial result（至少含 `status: "partial"`、`completed`、`failed`、`notAttempted` 和稳定错误码）返回；不得并行或继续猜测。
-5. `delete` 只按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted。Permanent Delete、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令不得调用或模拟这些 UI action。
+5. `delete` 只在已验证的 **All Recordings** view 按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted；若当前 view 是 Recently Deleted，必须拒绝，避免触发 Permanent Delete 确认。Permanent Delete、全部删除、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令永不调用或模拟这些 UI action。
 
 **后续条件：**满足上述 token、显式确认、可验证 UI 状态和串行验证条件后，才可评估非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。当前 production mutation 仍 blocked。
 
