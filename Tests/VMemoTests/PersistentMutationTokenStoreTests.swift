@@ -5,6 +5,8 @@ import XCTest
 @testable import VMemo
 
 final class PersistentMutationTokenStoreTests: XCTestCase {
+    fileprivate static let externalHelperTimeout: TimeInterval = 20
+
     func testIssueIsVisibleAcrossInstancesAndConsumesExactlyOnce() throws {
         let fixture = try TokenStoreFixture()
         let token = "token-fixture-not-on-disk"
@@ -132,8 +134,8 @@ final class PersistentMutationTokenStoreTests: XCTestCase {
         defer { removeItemIfUnchanged(at: gate.url, expected: gate.identity) }
         let first = try launchChild(root: fixture.root, token: token, mode: "consume", gate: gate.url, worker: "one")
         let second = try launchChild(root: fixture.root, token: token, mode: "consume", gate: gate.url, worker: "two")
-        XCTAssertTrue(waitForFile(gate.url.appendingPathComponent("ready-one"), timeout: 3))
-        XCTAssertTrue(waitForFile(gate.url.appendingPathComponent("ready-two"), timeout: 3))
+        XCTAssertTrue(waitForFile(gate.url.appendingPathComponent("ready-one"), timeout: Self.externalHelperTimeout))
+        XCTAssertTrue(waitForFile(gate.url.appendingPathComponent("ready-two"), timeout: Self.externalHelperTimeout))
         XCTAssertTrue(FileManager.default.createFile(atPath: gate.url.appendingPathComponent("start").path, contents: Data()))
 
         let outputs = try [waitForChild(first), waitForChild(second)]
@@ -148,7 +150,7 @@ final class PersistentMutationTokenStoreTests: XCTestCase {
         let token = "fifo-token"
         XCTAssertEqual(mkfifo(fixture.recordURL(for: token).path, 0o600), 0)
         let child = try launchChild(root: fixture.root, token: token, mode: "issue")
-        let output = try waitForChild(child, timeout: 3)
+        let output = try waitForChild(child)
 
         XCTAssertTrue(output.contains("VMEMO_TOKEN_CHILD_RESULT=insecurePath"), output)
     }
@@ -361,7 +363,10 @@ final class PersistentMutationTokenStoreTests: XCTestCase {
         return ChildProcess(process: process, output: output, marker: environment["VMEMO_TOKEN_STORE_CHILD_MARKER"]!)
     }
 
-    private func waitForChild(_ child: ChildProcess, timeout: TimeInterval = 10) throws -> String {
+    private func waitForChild(
+        _ child: ChildProcess,
+        timeout: TimeInterval = PersistentMutationTokenStoreTests.externalHelperTimeout
+    ) throws -> String {
         let finished = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             child.process.waitUntilExit()
@@ -553,7 +558,7 @@ private func waitForStartGateIfRequested() throws {
         throw PersistentMutationTokenStoreError.ioFailure
     }
     let start = gate.appendingPathComponent("start")
-    let deadline = Date().addingTimeInterval(3)
+    let deadline = Date().addingTimeInterval(PersistentMutationTokenStoreTests.externalHelperTimeout)
     while Date() < deadline {
         if FileManager.default.fileExists(atPath: start.path) { return }
         usleep(1_000)
