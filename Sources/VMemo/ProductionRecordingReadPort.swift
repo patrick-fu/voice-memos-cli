@@ -52,8 +52,15 @@ enum SystemProductionAdapterFactory {
         )
     }
 
-    private static func configuration() -> (recordingsRoot: URL, identity: RealSchemaIdentity, model: NSManagedObjectModel)? {
-        let environment = ProcessInfo.processInfo.environment
+    static func configuration(artifacts: any ProductionSystemArtifacts = SystemProductionArtifacts()) -> (recordingsRoot: URL, identity: RealSchemaIdentity, model: NSManagedObjectModel)? {
+        let osMajor = artifacts.runtimeOSMajor()
+        guard osMajor == 26 else { return nil }
+        let app = URL(fileURLWithPath: "/System/Applications/VoiceMemos.app", isDirectory: true)
+        let modelURL = URL(fileURLWithPath: "/System/iOSSupport/System/Library/PrivateFrameworks/VoiceMemos.framework/Versions/A/Resources/VoiceMemos.momd/VoiceMemos14.mom")
+        let versionURL = modelURL.deletingLastPathComponent().appendingPathComponent("VersionInfo.plist")
+        guard artifacts.isReadable(app), artifacts.isReadable(modelURL), artifacts.isReadable(versionURL) else { return nil }
+
+        let environment = artifacts.environment()
         let root: URL
         if let injected = environment["VMEMO_RECORDINGS_ROOT"], !injected.isEmpty {
             root = URL(fileURLWithPath: injected, isDirectory: true)
@@ -61,13 +68,10 @@ enum SystemProductionAdapterFactory {
             root = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings", isDirectory: true)
         }
-        let app = URL(fileURLWithPath: "/System/Applications/VoiceMemos.app", isDirectory: true)
-        let modelURL = URL(fileURLWithPath: "/System/iOSSupport/System/Library/PrivateFrameworks/VoiceMemos.framework/Versions/A/Resources/VoiceMemos.momd/VoiceMemos14.mom")
-        let versionURL = modelURL.deletingLastPathComponent().appendingPathComponent("VersionInfo.plist")
-        guard let bundle = Bundle(url: app),
-              let model = NSManagedObjectModel(contentsOf: modelURL),
-              let modelData = try? Data(contentsOf: modelURL),
-              let versionData = try? Data(contentsOf: versionURL),
+        guard let bundle = artifacts.bundle(at: app),
+              let model = artifacts.model(at: modelURL),
+              let modelData = try? artifacts.data(at: modelURL),
+              let versionData = try? artifacts.data(at: versionURL),
               let versionInfo = try? PropertyListSerialization.propertyList(from: versionData, format: nil) as? [String: Any],
               versionInfo["NSManagedObjectModel_CurrentVersionName"] as? String == "VoiceMemos14",
               let checksums = versionInfo["NSManagedObjectModel_VersionChecksums"] as? [String: Any],
@@ -75,11 +79,11 @@ enum SystemProductionAdapterFactory {
               SHA256.hash(data: modelData).map({ String(format: "%02x", $0) }).joined() == "551215bc009cf2ca2282c3876fb8d454d526fb5c0158c5a2818a9c2243cbe052"
         else { return nil }
         let identity = RealSchemaIdentity(
-            osMajor: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
+            osMajor: osMajor,
             bundleIdentifier: bundle.bundleIdentifier ?? "",
             bundleBuild: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
-            hasModelArtifact: FileManager.default.isReadableFile(atPath: modelURL.path),
-            hasVersionInfoArtifact: FileManager.default.isReadableFile(atPath: versionURL.path),
+            hasModelArtifact: true,
+            hasVersionInfoArtifact: true,
             currentModelName: "VoiceMemos14",
             archivedModelChecksum: "f2VnefWShYEiB9Sc058A/GWR/33tzv6vFKYxARhArH0=",
             modelSHA256: "551215bc009cf2ca2282c3876fb8d454d526fb5c0158c5a2818a9c2243cbe052",
@@ -90,6 +94,24 @@ enum SystemProductionAdapterFactory {
         )
         return (root, identity, model)
     }
+}
+
+protocol ProductionSystemArtifacts {
+    func runtimeOSMajor() -> Int
+    func environment() -> [String: String]
+    func isReadable(_ url: URL) -> Bool
+    func bundle(at url: URL) -> Bundle?
+    func model(at url: URL) -> NSManagedObjectModel?
+    func data(at url: URL) throws -> Data
+}
+
+struct SystemProductionArtifacts: ProductionSystemArtifacts {
+    func runtimeOSMajor() -> Int { ProcessInfo.processInfo.operatingSystemVersion.majorVersion }
+    func environment() -> [String: String] { ProcessInfo.processInfo.environment }
+    func isReadable(_ url: URL) -> Bool { FileManager.default.isReadableFile(atPath: url.path) }
+    func bundle(at url: URL) -> Bundle? { Bundle(url: url) }
+    func model(at url: URL) -> NSManagedObjectModel? { NSManagedObjectModel(contentsOf: url) }
+    func data(at url: URL) throws -> Data { try Data(contentsOf: url) }
 }
 
 private struct UnsupportedProductionReadPort: RecordingReadPort {
