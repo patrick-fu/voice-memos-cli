@@ -12,7 +12,7 @@
 | 能力 | 决策 | 条件 |
 | --- | --- | --- |
 | `list/search/show/export` | **Blocked** | schema、state predicate 与资产语义尚未完成 disposable 验证；production read 保持 fail closed。FDA 不是已证明的最小或唯一可行授权。 |
-| `rename/delete` | **已接线，当前 fail closed** | production coordinator 已要求 Accessibility、opaque-ID/UI tuple、持久 token、显式确认及逐条 fresh pre/post verification。已识别 build 1380 的虚拟化 `AXButton` 与 opaque custom-action token；`AXSetValue` search isolation 和 `AXPress` selection 已被 live probe 否证。Computer Use 可双击选择并进入/取消标题编辑，但 standalone CLI 不得依赖该私有运行时。production 继续拒绝且不执行 UI action。 |
+| `rename/delete` | **已接线，当前 fail closed** | production coordinator 已要求 Accessibility、opaque-ID/UI tuple、持久 token、显式确认及逐条 fresh pre/post verification。已识别 build 1380 的虚拟化 `AXButton` 与 opaque custom-action token；`AXSetValue` search isolation 和 `AXPress` selection 已被 live probe 否证。干净单窗口下，AX frame/hit-test + native `CGEvent` double-click 可选择 exact item，选中后 raw `编辑标题` 可进入编辑并取消。是否接受 AX + input synthesis、以及 rename commit transition 尚未决策/验证，production 继续拒绝。 |
 | 打开 Voice Memos、人工操作 | **Go（辅助路径）** | 可用于用户自行完成操作，但不是 `rename/delete` 命令的替代后端。 |
 | System Events/JXA UI scripting | **No-Go（默认实现）** | 它增加 Apple Events/Automation 面；尚无证据证明它能免除 Accessibility。仅可作为单独、后续实验证明的兼容后备。 |
 | 直接改 Voice Memos SQLite、资源或 CloudKit mirror | **No-Go** | FDA 只解决文件可读性，不提供 Core Data、`voicememod`、CloudKit 或 Recently Deleted 的一致性契约。 |
@@ -22,7 +22,7 @@
 
 `list`、`search`、`show`、`export`、`rename` 和 `delete` 都是 v0.1 的正常命令；权限、preflight 或确认不满足时返回明确错误，而不是把命令隐藏或改名。
 
-待 standalone CLI 的 exact target selection 与目标 edit/action state 通过完整 live 验证后，才考虑实际 token-confirmed 与无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read 仅在 exact build gate 下启用；mutation 已接线但保持 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
+待 AX + native input synthesis 的产品边界、rename commit transition 与 action 后 postcondition 通过完整验证后，才考虑实际 token-confirmed 与无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read 仅在 exact build gate 下启用；mutation 已接线但保持 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
 
 ## 权限矩阵
 
@@ -78,9 +78,11 @@
 - `AXUIElementCopyActionNames` 返回的 custom action 是多行 opaque token，例如首行 `Name:删除` 后还有桥接字段。语义识别可读取首行 label，但 `AXUIElementPerformAction` 必须使用 fresh tree 返回的完整原始 token。畸形、重复、未知与永久/批量删除类 label 全部 fail closed。
 - 窗口内有唯一、当前为空且 `AXValue` settable 的 `AXSearchField`，以及唯一承载列表按钮的可滚动 `AXGroup`。后续写入探针证明 `AXSetValue` 只改变 accessibility value，并不会可靠触发 Voice Memos 的实际过滤；`AXCancel` 能可靠清空。controlled search isolation 因此不可作为生产定位方案。
 
-同一次获授权的可逆 UI 探针还证明：对列表 `AXButton` 执行 `AXPress`、先设 `AXFocused` 再 `AXPress`、按 AX frame 定向发送单击，以及 `AXShowMenu`，都不能作为 standalone CLI 的可靠选择语义。Computer Use 在 fresh tree 上双击可选中目标，选中项随后暴露“编辑标题”；执行后出现 focused、settable title field，Escape 可取消，且取消后 title exact bytes 不变、search 为空、菜单关闭。Computer Use 的私有运行时不能成为公开 CLI backend，这项成功只证明 Voice Memos UI 的 edit/cancel state，不证明 CLI 已有 selection primitive。
+同一次获授权的可逆 UI 探针还证明：对列表 `AXButton` 执行 `AXPress`、先设 `AXFocused` 再 `AXPress`、按 AX frame 定向发送单击，以及 `AXShowMenu`，都不能作为 standalone CLI 的可靠选择语义。Computer Use 在 fresh tree 上双击可选中目标，选中项随后暴露“编辑标题”；执行后出现 focused、settable title field，Escape 可取消，且取消后 title exact bytes 不变、search 为空、菜单关闭。
 
-生产实现已支持 raw custom-action token 的保留、fresh 重读与原样执行，但仍保留 `rowsFullyRealized: false` 和 mutation safety gate。standalone target selection、分页扫描的可恢复性、Recently Deleted 定位和 action 后 postcondition 在 live 验证完成前均不得启用。搜索隔离已从候选方案中移除。
+进一步将 Voice Memos 重启为干净、唯一 `AXStandardWindow` 后，standalone probe 以 exact AX item frame 做 `AXUIElementCopyElementAtPosition` hit-test，再发送 native `CGEvent` double-click，成功让 detail title 与目标 description 前缀绑定。选中列表按钮的 custom action 集新增 `编辑标题`；执行其 fresh raw token 后，原有 detail title field 获得焦点，native cancel 退出且没有写 title。此前失败的 coordinate probe 发生在额外 non-modal `AXDialog` 存在时；生产若采纳该路线必须继续要求唯一 standard window，任何额外 window fail closed。该证据证明 selection/edit/cancel primitive 可实现，不等于已验证设置新 title 与 commit。
+
+生产实现已支持 raw custom-action token 的保留、fresh 重读与原样执行，但仍保留 `rowsFullyRealized: false` 和 mutation safety gate。CGEvent input synthesis 尚未进入生产；分页扫描的可恢复性、rename commit、Recently Deleted 定位和 action 后 postcondition 在 live 验证完成前均不得启用。搜索隔离已从候选方案中移除。
 
 ### 进程身份：必须保守处理
 
@@ -124,7 +126,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 
 ## `rename/delete` 执行协议（v0.1 contract）
 
-`rename` 和 `delete` 的唯一写后端是原生 `AXUIElement`；它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 或 Computer Use 作为 silent fallback。协调器使用持久化、跨进程原子消费的 30 秒 token；记录只保留 request/source/AX/environment 的 SHA-256，根目录为 `~/Library/Application Support/vmemo/mutation-authorizations`，只在 mutation 首次尝试时惰性创建。session lock 覆盖 fresh resolver snapshot、AX verification、consume、action 与 DB/AX postcondition；action 或任一 postcondition 不确定后 token 仍不可重放。synthetic manifest、typed actions 和 opaque raw-token handling 已实现；standalone target selection 尚未完成 live 验证，因此 production preflight fail closed，不触发 action。
+`rename` 和 `delete` 当前约定的唯一写后端是原生 `AXUIElement`；它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 或 Computer Use 作为 silent fallback。是否将公开 CoreGraphics input synthesis 纳入同一受验证 UI backend，需要显式产品决策。协调器使用持久化、跨进程原子消费的 30 秒 token；记录只保留 request/source/AX/environment 的 SHA-256，根目录为 `~/Library/Application Support/vmemo/mutation-authorizations`，只在 mutation 首次尝试时惰性创建。session lock 覆盖 fresh resolver snapshot、AX verification、consume、action 与 DB/AX postcondition；action 或任一 postcondition 不确定后 token 仍不可重放。synthetic manifest、typed actions 和 opaque raw-token handling 已实现；该决策与 rename commit 验证完成前 production preflight fail closed，不触发 action。
 
 **Store 信任边界：**0700 root、0600 records 和 `O_NOFOLLOW` 验证可拒绝 symlink、hardlink、FIFO、损坏记录等 hostile path node；跨进程 exactly-once 针对正常或竞争进程。它信任同 UID 进程及父目录：能替换整个 0700 root 的同 UID 恶意代码不在此威胁模型内，不能宣称 token/session store 可抵御该情形。
 
@@ -134,7 +136,7 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 4. v0.1 只提供 flat 的单 Recording 命令；不接受 batch 输入或返回 partial result。
 5. `delete` 只在已验证的 **All Recordings** view 按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted；若当前 view 是 Recently Deleted，必须拒绝，避免触发 Permanent Delete 确认。Permanent Delete、全部删除、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令永不调用或模拟这些 UI action。
 
-**后续条件：**需验证 standalone exact-target selection、scope-specific action allowlist、分页定位恢复和 rename edit/commit state 后，才可实际执行 token-confirmed mutation 并评估非交互或无人值守调用。虚拟列表永不要求“完整实现”，search isolation 不再作为候选。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
+**后续条件：**若接受 AX + CGEvent，需把唯一窗口、exact frame hit-test、double-click 后 detail binding、scope-specific action allowlist、分页定位恢复和 rename commit 编码为 fail-closed contract；若不接受，则 mutation 保持不可用。之后才可实际执行 token-confirmed mutation 并评估非交互或无人值守调用。虚拟列表永不要求“完整实现”，search isolation 不再作为候选。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
 
 ## Doctor、拒绝处理与失败关闭
 
