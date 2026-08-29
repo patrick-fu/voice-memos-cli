@@ -2,7 +2,7 @@
 
 An agent-friendly macOS CLI project for safely searching, inspecting, exporting, renaming, and deleting Voice Memos.
 
-> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Rename and delete use the same exact DB gate plus native Accessibility pre/post verification. A synthetic AX manifest and typed actions exist, but live row completeness is unverified, so production fails closed during preflight (typically as virtualized UI). Every unsupported condition fails closed.
+> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Rename and delete use the same exact DB gate plus native Accessibility pre/post verification. The build 1380 live tree is virtualized: recording items are `AXButton` elements and custom actions are opaque native tokens. Raw-token handling is implemented, but controlled search isolation and rename edit-state transitions are not yet validated, so production mutation still fails closed. Every unsupported condition fails closed.
 
 The v0.1 contract is being designed around stable JSON, explicit exit codes, stdout/stderr separation, dry-run and confirmation controls, and the current plus previous major macOS versions.
 
