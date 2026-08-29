@@ -4,11 +4,11 @@ import XCTest
 
 final class RealSchemaRecognizerTests: XCTestCase {
     func testRecognitionCodesAreStable() {
-        XCTAssertEqual(RealSchemaRecognition.needsDisposableValidation.code, "needs_disposable_validation")
+        XCTAssertEqual(RealSchemaRecognition.recognized.code, "recognized_schema")
         XCTAssertEqual(RealSchemaRecognition.unsupportedSchema.code, "unsupported_schema")
     }
 
-    func testObservedBuild1380StoreMetadataNeedsDisposableValidation() {
+    func testObservedBuild1380StoreMetadataIsRecognized() {
         var observedHashes = storeHashes()
         observedHashes["CloudRecording"] = .data(
             Data(base64Encoded: "wzISBP+96pkUsBpdE2V3vJH08CnDBpBi8U/vSlVVosQ=")!
@@ -27,17 +27,17 @@ final class RealSchemaRecognizerTests: XCTestCase {
 
         XCTAssertEqual(
             recognize(storeMetadata: observedStoreMetadata),
-            .needsDisposableValidation
+            .recognized
         )
     }
 
-    func testExactDocumentedEvidenceIsRecognizedButStillBlockedForDisposableValidation() {
+    func testExactDocumentedEvidenceIsRecognizedByMetadataGate() {
         let reader = FakePersistentStoreMetadataReader(
             result: .success(metadata(compatibleWithRuntimeModel: true))
         )
         let recognizer = RealSchemaRecognizer(identity: supportedIdentity, metadataReader: reader)
 
-        XCTAssertEqual(recognizer.recognize(snapshot: isolatedSnapshot), .needsDisposableValidation)
+        XCTAssertEqual(recognizer.recognize(snapshot: isolatedSnapshot), .recognized)
         XCTAssertEqual(reader.snapshotURLs, [isolatedSnapshotURL])
     }
 
@@ -144,7 +144,7 @@ final class RealSchemaRecognizerTests: XCTestCase {
     func testStaticModelCompatibilityIsDiagnosticAndDoesNotGateObservedManifest() {
         XCTAssertEqual(
             recognize(storeMetadata: metadata(compatibleWithRuntimeModel: false)),
-            .needsDisposableValidation
+            .recognized
         )
     }
 

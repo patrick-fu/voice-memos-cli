@@ -15,8 +15,8 @@ enum SnapshottingRealSchemaRecognitionError: Error, Equatable, Sendable {
 /// The recommended production entry for schema recognition.
 ///
 /// It obtains an isolated snapshot before invoking the metadata-only recognizer and always
-/// cleans that snapshot exactly once. It is intentionally unwired from the CLI: recognition
-/// remains blocked pending disposable validation and does not enable list/search/show/export.
+/// cleans that snapshot exactly once. Recognition authorizes only the subsequent physical and
+/// row gates; it never by itself projects a recording.
 struct SnapshottingRealSchemaRecognizer: Sendable {
     private let source: URL
     private let destinationRoot: URL

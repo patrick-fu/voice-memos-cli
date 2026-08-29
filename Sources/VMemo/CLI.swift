@@ -177,12 +177,7 @@ private struct MutationOptions: ParsableArguments {
 }
 
 private enum ProductionComposition {
-    static let runner = CommandRunner(
-        read: UnconfiguredReadPort(),
-        asset: UnconfiguredAssetPort(),
-        write: UnconfiguredWritePort(),
-        doctor: SystemDoctorPort()
-    )
+    static let runner = SystemProductionAdapterFactory.makeRunner()
 }
 
 private enum ProcessIO {

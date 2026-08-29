@@ -54,7 +54,7 @@ final class VMemoCLITests: XCTestCase {
         }
     }
 
-    func testListJSONReportsVersionedSafetyEnvelopeWhenAdapterIsUnconfigured() throws {
+    func testListJSONReportsVersionedSafetyEnvelopeWhenFixtureRootHasNoStore() throws {
         let result = try runVMemo("list", "--json")
 
         XCTAssertEqual(result.status, 4)
@@ -62,7 +62,10 @@ final class VMemoCLITests: XCTestCase {
         let envelope = try decodeJSON(result.stderr)
         XCTAssertEqual(envelope["version"] as? Int, 1)
         XCTAssertEqual(envelope["status"] as? String, "error")
-        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "adapter_not_configured")
+        let expectedCode = ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26
+            ? "snapshot_creation_failed"
+            : "unsupported_schema"
+        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, expectedCode)
     }
 
     func testDoctorSubprocessWritesAReportForHumanJSONAndExplicitUIModes() throws {
@@ -297,11 +300,18 @@ final class VMemoCLITests: XCTestCase {
 
     private func runVMemo(_ arguments: [String]) throws -> ProcessResult {
         let binaryDirectory = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
+        let fixtureRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("vmemo-subprocess-fixture-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: fixtureRoot) }
         let process = Process()
         let stdout = Pipe()
         let stderr = Pipe()
         process.executableURL = binaryDirectory.appendingPathComponent("vmemo")
         process.arguments = arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["VMEMO_RECORDINGS_ROOT"] = fixtureRoot.path
+        process.environment = environment
         process.standardOutput = stdout
         process.standardError = stderr
         try process.run()

@@ -2,9 +2,11 @@
 
 An agent-friendly macOS CLI project for safely searching, inspecting, exporting, renaming, and deleting Voice Memos.
 
-> Status: early implementation. The CLI contract and fail-closed foundation exist; production Voice Memos adapters are not implemented yet.
+> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Every other OS, build, store manifest, physical schema, or row-value shape fails closed. Mutations remain unconfigured.
 
 The v0.1 contract is being designed around stable JSON, explicit exit codes, stdout/stderr separation, dry-run and confirmation controls, and the current plus previous major macOS versions.
+
+`list`, `search`, `show`, and `export` first create a temporary SQLite snapshot, then validate the exact bundle identity, Core Data persistent-store metadata, and 29-column `ZCLOUDRECORDING` schema. Only rows whose `ZEVICTIONDATE` is SQLite `NULL` are exposed. `VMEMO_RECORDINGS_ROOT` is a test-only root override; subprocess tests must always set it to an isolated fixture directory.
 
 ## Plan
 

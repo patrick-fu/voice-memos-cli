@@ -18,12 +18,12 @@ struct RealSchemaIdentity: Equatable, Sendable {
 }
 
 enum RealSchemaRecognition: Equatable, Sendable {
-    case needsDisposableValidation
+    case recognized
     case unsupportedSchema
 
     var code: String {
         switch self {
-        case .needsDisposableValidation: "needs_disposable_validation"
+        case .recognized: "recognized_schema"
         case .unsupportedSchema: "unsupported_schema"
         }
     }
@@ -182,7 +182,7 @@ struct RealSchemaRecognizer: Sendable {
         else {
             return .unsupportedSchema
         }
-        return .needsDisposableValidation
+        return .recognized
     }
 
     private func isDocumentedIdentity(_ identity: RealSchemaIdentity) -> Bool {

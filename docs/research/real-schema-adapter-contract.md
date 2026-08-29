@@ -1,16 +1,16 @@
 # 真实 Voice Memos 只读 schema adapter：允许表与阻断条件
 
-研究日期：2026-08-29。对应 [issue #25](https://github.com/patrick-fu/voice-memos-cli/issues/25)（并延续 [issue #21](https://github.com/patrick-fu/voice-memos-cli/issues/21) 的语义边界）。本文件只定义生产代码**可检测的结构**和必须拒绝的情况；它不把 Core Data 私有 SQLite 格式变成公开 API 合同，也不授权查询真实库的 recording 行。
+研究日期：2026-08-29。对应 [issue #25](https://github.com/patrick-fu/voice-memos-cli/issues/25)（并延续 [issue #21](https://github.com/patrick-fu/voice-memos-cli/issues/21) 的语义边界）。本文件定义生产代码**可检测的结构**和必须拒绝的情况；它不把 Core Data 私有 SQLite 格式变成公开 API 合同。issue #27 已将本文件的 exact build-1380 metadata、29 列物理 schema、标题、状态和 asset 约束实现为只读 snapshot adapter；其他版本仍一律拒绝。
 
 ## 结论
 
-**目前不能实现会返回 “Active Recording” 的 production 真实 read adapter；production read/mutation 仍 blocked。** macOS 26 有足够的 Apple bundle 元数据，能写出一个 fail-closed 的 *schema recognizer*；Title 仅在下方当前 build manifest 条件满足时具备候选映射，仍不能据此放行 production 读取。尚不足以安全决定下列语义：
+**production 真实 read 仅在 exact macOS 26 build-1380 contract 下可用；mutation 仍 blocked。** macOS 26 的 bundle、store metadata、physical schema 与下列行级条件共同构成 fail-closed gate。
 
 - 当前 build manifest 之外的 Title 语义，或 sorting/encrypted 两字段不一致时的 fallback；
 - 哪些 `ZCLOUDRECORDING` 行处于正常资料库、Recently Deleted、云端占位或已驱逐状态；
 - `ZPATH` 是否始终是相对路径、对应可导出的本地资产，或 `.qta` 的 export 语义。
 
-所以本轮的 code-ready contract 是：先实现 **macOS 26 / Voice Memos build 1380 / VoiceMemos14 模型的识别与拒绝**，但识别成功后仍返回 `needs_disposable_validation`，不执行 `list`、`search`、`show` 或 `export`。macOS 15 没有本机 Apple bundle、store metadata 或固定源码的同等级证据，必须为 `unsupported_schema`。
+当前 production contract 仅支持 **macOS 26 / Voice Memos build 1380 / VoiceMemos14** 的 exact identity、metadata 与 physical schema。`list`、`search`、`show` 和 `.m4a` `export` 只能通过安全临时 snapshot 进入该 contract；macOS 15 与任一其他 build 必须为 `unsupported_schema`。
 
 这是有意收窄，不是由 synthetic fixture 推出真实兼容性。Apple 明确说明 Core Data 原生 SQLite store 格式是私有的，不应以 SQLite API 创建或修改该类 store；本项目只讨论受用户授权的只读 snapshot 检测，绝不写入。[“Persistent Store Types and Behaviors”](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/CoreData/PersistentStoreFeatures.html)
 
@@ -149,7 +149,7 @@ for p in m.entitiesByName["CloudRecording"]!.properties.sorted(by: { $0.name < $
 1. `sw_vers` 主版本必须为 `26`；Voice Memos bundle 的 bundle ID 必须为 `com.apple.VoiceMemos`、`CFBundleVersion` 必须为 `1380`。任何 OS/build 偏差一律 `unsupported_schema`，包括 macOS 15。
 2. 必须存在 Apple framework 的 `VoiceMemos14.mom` 和 `VersionInfo.plist`，并匹配 current-name、`VersionInfo` archived model checksum `f2V…`、`.mom` SHA-256 `551215…`；这些只确认 bundle artifact。再从该 `.mom` 实例化 runtime model，并核验 runtime `CloudRecording` hash `Q5vg…` 与 model checksum `Rzot…`，但**不得**要求它们等于 store manifest。
 3. 用 Apple 的 persistent-store metadata API 从 snapshot 读取 metadata，并对独立 observed store manifest 做 exact match：`CloudRecording` hash `wzISBP+…`、store model checksum `n+kk0f+…`、digest `8aTQ…PCA==`、hash version `3`、framework/max `1526`、store type `SQLite`、model version identifiers `[""]`，以及其余五个 entity hash 的完整值。任何缺 key、额外 key、类型/长度/value mismatch 均为 `unsupported_schema`。`NSManagedObjectModel.isConfiguration(_:compatibleWithStoreMetadata:)` 仅作诊断，不是放行条件；其结果（包括与 bundle model 不 compatible）不得单独导致 fail-closed。Core Data metadata/version API 仍仅用于读取与诊断。[`NSManagedObjectModel`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel) [`versionIdentifiers`](https://developer.apple.com/documentation/coredata/nsmanagedobjectmodel/versionidentifiers)
-4. recognizer 只允许 exact 匹配上述独立 store manifest，命中后仍返回 `needs_disposable_validation`，绝不启用 real list/search/show/export。物理列声明（包括 `ZCLOUDRECORDING`）只记录为 single build/store observation；在 disposable matrix 完成前，不得把列名、affinity、row value 或 `sqlite3_column_type` 作为放行/拒绝条件。
+4. recognizer 只允许 exact 匹配上述独立 store manifest，命中后返回 `recognized_schema`。这只完成 identity/metadata gate；production 仍必须在同一 isolated snapshot 上通过 exact physical schema 与全表 row gate，之后才可投影或 export。
 5. `PRAGMA schema_version=1326` 若出现，只可写入 diagnostic fingerprint，**绝不可**作为单独或决定性 token。它是 SQLite schema-cookie，不是 Apple model/version 合同；单独相同的 cookie 不能证明字段语义、model hash 或 app build 相同。
 
 第 4 点只把上方 canonical `ZCLOUDRECORDING` fingerprint 作为 observed fact 保存，不把它误升格为 Apple 合同。下列断言仍为 **unsupported，不能写死进 production allowlist**：`ZDATE` 的具体 SQLite type/epoch、`ZDURATION` 的 declaration、`ZFLAGS` bit 宽度/意义、`ZFOLDER` 的 FK/NULL/ON DELETE 行为、`Z_METADATA` 的行数/列格式和 `Z_PLIST` 编码，以及任何 affinity→Core Data type mapping 或 row-value validation。把这些提升为 exact contract 前，必须完成下述 disposable-user matrix。
@@ -225,11 +225,11 @@ ZDURATION >= <threshold>
 ## 实施顺序与验收
 
 1. 保持现有 `SchemaAdapter` 的 synthetic-only 行为；不要把 `SyntheticSchemaFixture.Revision.macOS15/macOS26` 解释为真实 schema 支持。
-2. 新增独立 `RealSchemaRecognizer` 时只读取 snapshot header/schema metadata，并以本文件第 4 节 gate 返回 `unsupported_schema` 或 `needs_disposable_validation`；不得 SQL 投影用户行。
+2. `RealSchemaRecognizer` 只读取 snapshot header/schema metadata，并以本文件第 4 节 gate 返回 `unsupported_schema` 或 `recognized_schema`；`recognized_schema` 后仍需独立 physical/row adapter，recognizer 本身不得 SQL 投影用户行。
 3. 为 recognizer 写 synthetic metadata contract tests：错 build、错 `.mom` hash、缺/多 manifest key、任一 hash 的任一 byte 改动（即使 `isConfiguration(_:compatibleWithStoreMetadata:)` 返回 true）、值非 32 bytes、metadata 不可读取、manifest version identifiers 非 `[""]`、仅 `schema_version=1326`、未知 OS，全部因 manifest mismatch fail closed。`isConfiguration` 返回 false 仅记录 diagnostic，不作为失败条件。另写不进入当前 gate 的 future physical-fingerprint tests：它们只在 disposable matrix 固定 exact DDL/column manifest 后，才可变成 row-reader 的升级测试；真实 DB/asset 不进入 tests。
 4. 完成上节所有 macOS 26 matrix 后，才把验证结果（固定 build/model/DDL/state/title/asset manifest）加入 allowlist，并以新的 issue 决定是否实现 row reader。macOS 15 单独走相同流程。
 
-**可进入实现的范围：** recognizer、错误码、synthetic contract tests。**不可进入实现的范围：** production real list/search/show/export、production AX read/mutation、title fallback、active/deleted filtering、placeholder detection、资产复制。证据强度足以实现前者，不足以安全实现后者。
+**实现范围：** exact recognizer、physical/row gate、只读 snapshot list/search/show 与相对 `.m4a` export。**不可进入实现的范围：** production AX read/mutation、title fallback、其他版本、`.qta`、placeholder detection 与私有 store 写入。
 
 ## 参考来源
 

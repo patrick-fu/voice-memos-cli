@@ -8,7 +8,7 @@ final class SnapshottingRealSchemaRecognizerTests: XCTestCase {
         let reader = CoordinatorMetadataReader(result: .success(supportedStoreMetadata))
         let coordinator = makeCoordinator(snapshot: snapshot, metadataReader: reader)
 
-        XCTAssertEqual(try coordinator.recognize(), .needsDisposableValidation)
+        XCTAssertEqual(try coordinator.recognize(), .recognized)
         XCTAssertEqual(snapshot.createCalls, 1)
         XCTAssertEqual(snapshot.cleanupCalls, 1)
         XCTAssertEqual(snapshot.sources, [sourceURL])
