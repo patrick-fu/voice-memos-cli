@@ -210,6 +210,20 @@ struct CommandRunner: Sendable {
         if let error = error as? MutationAuthorizationError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         }
+        if let error = error as? ProductionMutationWriteError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
+        }
+        if let error = error as? ProductionMutationResolverError {
+            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
+        }
+        if error is VoiceMemosAccessibilityError {
+            return failure(
+                code: "mutation_preflight_failed",
+                message: "The mutation target could not be safely verified.",
+                exitCode: ProcessExit.safetyFailure.rawValue,
+                output: output
+            )
+        }
         return failure(
             code: "adapter_operation_failed",
             message: "The \(operation) adapter failed.",

@@ -22,28 +22,28 @@ struct ProductionRecordingAdapter: RecordingReadPort, RecordingAssetReferenceRes
 
     init(snapshotURL: URL) { self.snapshotURL = snapshotURL }
 
-    func list() throws -> [RecordingSummary] { try rows().active.map(\.summary) }
+    func list() throws -> [RecordingSummary] { try validatedProjection().active.map(\.summary) }
 
     func search(query: String) throws -> [RecordingSummary] {
-        try rows().active.map(\.summary).filter {
+        try validatedProjection().active.map(\.summary).filter {
             $0.title.range(of: query, options: .caseInsensitive, range: nil, locale: Locale(identifier: "en_US_POSIX")) != nil
         }
     }
 
     func show(id: RecordingID) throws -> RecordingSummary {
-        guard let row = try rows().active.first(where: { $0.id == id }) else { throw ProductionRecordingAdapterError.recordingNotFound }
+        guard let row = try validatedProjection().active.first(where: { utf8ExactEqual($0.id.value, id.value) }) else { throw ProductionRecordingAdapterError.recordingNotFound }
         return row.summary
     }
 
     func assetReference(for id: RecordingID) throws -> String? {
-        guard let row = try rows().active.first(where: { $0.id == id }) else { throw ProductionRecordingAdapterError.recordingNotFound }
+        guard let row = try validatedProjection().active.first(where: { utf8ExactEqual($0.id.value, id.value) }) else { throw ProductionRecordingAdapterError.recordingNotFound }
         guard let path = row.path else { return nil }
         guard safeProductionReference(path) != nil else { throw RecordingAssetError.pathOutsideRecordingsRoot }
         guard path.hasSuffix(".m4a") else { throw RecordingAssetError.unsupportedAssetFormat }
         return path
     }
 
-    private func rows() throws -> (active: [Row], all: [Row]) {
+    func validatedProjection() throws -> ProductionValidatedProjection {
         var connection: OpaquePointer?
         guard sqlite3_open_v2(snapshotURL.path, &connection, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let connection else {
             sqlite3_close_v2(connection)
@@ -57,7 +57,7 @@ struct ProductionRecordingAdapter: RecordingReadPort, RecordingAssetReferenceRes
         let loaded = try loadRows(connection)
         guard sqlite3_exec(connection, "COMMIT", nil, nil, nil) == SQLITE_OK else { throw ProductionRecordingAdapterError.unsupportedSchema }
         open = false
-        return (loaded.filter(\.isActive), loaded)
+        return ProductionValidatedProjection(recordings: loaded)
     }
 
     private func validateSchema(_ connection: OpaquePointer) throws {
@@ -85,23 +85,23 @@ struct ProductionRecordingAdapter: RecordingReadPort, RecordingAssetReferenceRes
         else { throw ProductionRecordingAdapterError.unsupportedSchema }
     }
 
-    private func loadRows(_ connection: OpaquePointer) throws -> [Row] {
+    private func loadRows(_ connection: OpaquePointer) throws -> [ProductionValidatedRecording] {
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
         let sql = "SELECT ZUNIQUEID, ZCUSTOMLABELFORSORTING, ZENCRYPTEDTITLE, ZPATH, ZEVICTIONDATE FROM ZCLOUDRECORDING ORDER BY ZUNIQUEID COLLATE BINARY"
         guard sqlite3_prepare_v2(connection, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw ProductionRecordingAdapterError.unsupportedSchema }
-        var ids = Set<String>()
-        var result: [Row] = []
+        var ids = Set<Data>()
+        var result: [ProductionValidatedRecording] = []
         var step = sqlite3_step(statement)
         while step == SQLITE_ROW {
             guard sqlite3_column_type(statement, 0) == SQLITE_TEXT,
                   sqlite3_column_type(statement, 1) == SQLITE_TEXT,
                   sqlite3_column_type(statement, 2) == SQLITE_TEXT,
-                  let id = text(statement, 0), !id.isEmpty,
-                  let sortingTitle = text(statement, 1), !sortingTitle.isEmpty,
-                  let encryptedTitle = text(statement, 2), !encryptedTitle.isEmpty,
-                  sortingTitle == encryptedTitle,
-                  ids.insert(id).inserted
+                  let id = text(statement, 0), !id.utf8.isEmpty,
+                  let sortingTitle = text(statement, 1), !sortingTitle.utf8.isEmpty,
+                  let encryptedTitle = text(statement, 2), !encryptedTitle.utf8.isEmpty,
+                  utf8ExactEqual(sortingTitle, encryptedTitle),
+                  ids.insert(Data(id.utf8)).inserted
             else { throw ProductionRecordingAdapterError.unsupportedSchema }
             let path: String?
             switch sqlite3_column_type(statement, 3) {
@@ -115,19 +115,11 @@ struct ProductionRecordingAdapter: RecordingReadPort, RecordingAssetReferenceRes
             case SQLITE_FLOAT: active = false
             default: throw ProductionRecordingAdapterError.unsupportedSchema
             }
-            result.append(Row(id: RecordingID(value: id), title: sortingTitle, path: path, isActive: active))
+            result.append(ProductionValidatedRecording(id: RecordingID(value: id), title: sortingTitle, path: path, isActive: active))
             step = sqlite3_step(statement)
         }
         guard step == SQLITE_DONE else { throw ProductionRecordingAdapterError.unsupportedSchema }
         return result
-    }
-
-    private struct Row: Sendable {
-        let id: RecordingID
-        let title: String
-        let path: String?
-        let isActive: Bool
-        var summary: RecordingSummary { RecordingSummary(id: id, title: title) }
     }
 
     private static let canonicalSchema = [
@@ -144,9 +136,63 @@ private func text(_ statement: OpaquePointer, _ index: Int32) -> String? {
     return String(bytes: UnsafeBufferPointer(start: pointer, count: Int(sqlite3_column_bytes(statement, index))), encoding: .utf8)
 }
 
+
+func utf8ExactEqual(_ lhs: String, _ rhs: String) -> Bool {
+    lhs.utf8.elementsEqual(rhs.utf8)
+}
+
 private func safeProductionReference(_ path: String) -> [String]? {
     guard !path.isEmpty, !path.contains("\0"), !path.hasPrefix("/"), !path.hasPrefix("\\") else { return nil }
     let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
     guard !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else { return nil }
     return parts
+}
+
+struct ProductionValidatedRecording: Equatable, Sendable {
+    let id: RecordingID
+    let title: String
+    let path: String?
+    let isActive: Bool
+    var summary: RecordingSummary { RecordingSummary(id: id, title: title) }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        utf8ExactEqual(lhs.id.value, rhs.id.value)
+            && utf8ExactEqual(lhs.title, rhs.title)
+            && lhs.path == rhs.path
+            && lhs.isActive == rhs.isActive
+    }
+}
+
+struct ProductionValidatedProjection: Equatable, Sendable {
+    let recordings: [ProductionValidatedRecording]
+    let fingerprint: String
+
+    init(recordings: [ProductionValidatedRecording]) {
+        self.recordings = recordings
+        fingerprint = Self.fingerprint(for: recordings)
+    }
+
+    var active: [ProductionValidatedRecording] { recordings.filter(\.isActive) }
+
+    private static let fingerprintVersion = Data("VMEMO-SRC-FP-1".utf8)
+
+    private static func fingerprint(for recordings: [ProductionValidatedRecording]) -> String {
+        var payload = fingerprintVersion
+        appendUInt32(&payload, UInt32(recordings.count))
+        for recording in recordings {
+            let id = Data(recording.id.value.utf8)
+            let title = Data(recording.title.utf8)
+            appendUInt32(&payload, UInt32(id.count))
+            payload.append(id)
+            appendUInt32(&payload, UInt32(title.count))
+            payload.append(title)
+            payload.append(recording.isActive ? 1 : 0)
+        }
+        return SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func appendUInt32(_ data: inout Data, _ value: UInt32) {
+        var bigEndian = value.bigEndian
+        withUnsafeBytes(of: &bigEndian) { data.append(contentsOf: $0) }
+    }
 }

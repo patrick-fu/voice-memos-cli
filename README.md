@@ -2,11 +2,13 @@
 
 An agent-friendly macOS CLI project for safely searching, inspecting, exporting, renaming, and deleting Voice Memos.
 
-> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Every other OS, build, store manifest, physical schema, or row-value shape fails closed. Mutations remain unconfigured.
+> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Rename and delete use the same exact DB gate plus native Accessibility pre/post verification. A synthetic AX manifest and typed actions exist, but live row completeness is unverified, so production fails closed during preflight (typically as virtualized UI). Every unsupported condition fails closed.
 
 The v0.1 contract is being designed around stable JSON, explicit exit codes, stdout/stderr separation, dry-run and confirmation controls, and the current plus previous major macOS versions.
 
 `list`, `search`, `show`, and `export` first create a temporary SQLite snapshot, then validate the exact bundle identity, Core Data persistent-store metadata, and 29-column `ZCLOUDRECORDING` schema. Only rows whose `ZEVICTIONDATE` is SQLite `NULL` are exposed. `VMEMO_RECORDINGS_ROOT` is a test-only root override; subprocess tests must always set it to an isolated fixture directory.
+
+`rename` and `delete` retain their two-call shape: `--dry-run` returns a 30-second token; a second identical invocation needs `--token` and `--confirm`. Tokens bind canonical request, fresh DB source, fresh AX verification, and environment fingerprints; only their hashes are stored. The authorization directory is created lazily only by a mutation attempt at `~/Library/Application Support/vmemo/mutation-authorizations` (tests may set `VMEMO_MUTATION_TOKEN_ROOT`). A process-wide session lock covers verification, consumption before UI action, and fresh DB/UI postconditions. No read, help, or doctor command creates or accesses it.
 
 ## Plan
 

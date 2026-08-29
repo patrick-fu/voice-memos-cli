@@ -21,6 +21,13 @@ final class ProductionRecordingAdapterTests: XCTestCase {
         XCTAssertThrowsError(try adapter.assetReference(for: RecordingID(value: "opaque-deleted"))) { error in
             XCTAssertEqual(error as? ProductionRecordingAdapterError, .recordingNotFound)
         }
+
+        let projection = try adapter.validatedProjection()
+        XCTAssertEqual(projection.recordings.map(\.id.value), ["opaque-active", "opaque-deleted"])
+        XCTAssertEqual(projection.recordings.map(\.isActive), [true, false])
+        XCTAssertEqual(projection.fingerprint.count, 64)
+        XCTAssertFalse(projection.fingerprint.contains("opaque-active"))
+        XCTAssertFalse(projection.fingerprint.contains("Fixture title"))
     }
 
     func testSchemaAndRowContractFailClosed() throws {
@@ -55,6 +62,41 @@ final class ProductionRecordingAdapterTests: XCTestCase {
         }
     }
 
+    func testSortingAndEncryptedTitlesRejectCanonicalOnlyEquality() throws {
+        XCTAssertEqual(UnicodeExactFixture.nfcEAcute, UnicodeExactFixture.nfdEAcute)
+        XCTAssertFalse(utf8ExactEqual(UnicodeExactFixture.nfcEAcute, UnicodeExactFixture.nfdEAcute))
+        let fixture = try ProductionStoreFixture.make(rows: [
+            .init(
+                id: "opaque",
+                title: UnicodeExactFixture.nfcEAcute,
+                path: "audio.m4a",
+                eviction: .null,
+                encryptedTitle: UnicodeExactFixture.nfdEAcute
+            )
+        ])
+        defer { fixture.cleanup() }
+        XCTAssertThrowsError(try ProductionRecordingAdapter(snapshotURL: fixture.databaseURL).list()) { error in
+            XCTAssertEqual(error as? ProductionRecordingAdapterError, .unsupportedSchema)
+        }
+    }
+
+    func testNFCAndNFDRecordingIDsAreDistinctByteIdentities() throws {
+        let fixture = try ProductionStoreFixture.make(rows: [
+            .init(id: "id-" + UnicodeExactFixture.nfcEAcute, title: "First title", path: "first.m4a", eviction: .null),
+            .init(id: "id-" + UnicodeExactFixture.nfdEAcute, title: "Second title", path: "second.m4a", eviction: .null),
+        ])
+        defer { fixture.cleanup() }
+        let adapter = ProductionRecordingAdapter(snapshotURL: fixture.databaseURL)
+        let projection = try adapter.validatedProjection()
+        XCTAssertEqual(projection.recordings.count, 2)
+        let nfc = try adapter.show(id: RecordingID(value: "id-" + UnicodeExactFixture.nfcEAcute))
+        let nfd = try adapter.show(id: RecordingID(value: "id-" + UnicodeExactFixture.nfdEAcute))
+        XCTAssertTrue(utf8ExactEqual(nfc.id.value, "id-" + UnicodeExactFixture.nfcEAcute))
+        XCTAssertTrue(utf8ExactEqual(nfd.id.value, "id-" + UnicodeExactFixture.nfdEAcute))
+        XCTAssertTrue(utf8ExactEqual(nfc.title, "First title"))
+        XCTAssertTrue(utf8ExactEqual(nfd.title, "Second title"))
+    }
+
     func testDeletedExportReturnsStableNotFoundCode() throws {
         let fixture = try ProductionStoreFixture.make(rows: [.init(id: "opaque-deleted", title: "Fixture title", path: "deleted.m4a", eviction: .real(1.5))])
         defer { fixture.cleanup() }
@@ -70,10 +112,23 @@ final class ProductionRecordingAdapterTests: XCTestCase {
     }
 }
 
-private struct ProductionStoreFixture {
+struct ProductionStoreFixture {
     enum Fault { case missingColumn, extraColumn, reorderedColumn, wrongType, defaultValue, notNull, wrongPrimaryKey, duplicateID, emptyID, invalidUTF8ID, titleMismatch, emptyTitle, integerEviction, textEviction }
-    enum Eviction: Equatable { case null, real(Double) }
-    struct Row { let id: String; let title: String; let path: String; let eviction: Eviction }
+    enum Eviction: Equatable { case null, real(Double), integer }
+    struct Row {
+        let id: String
+        let title: String
+        let path: String
+        let eviction: Eviction
+        let encryptedTitle: String
+        init(id: String, title: String, path: String, eviction: Eviction, encryptedTitle: String? = nil) {
+            self.id = id
+            self.title = title
+            self.path = path
+            self.eviction = eviction
+            self.encryptedTitle = encryptedTitle ?? title
+        }
+    }
     let root: URL
     let databaseURL: URL
 
@@ -103,21 +158,63 @@ private struct ProductionStoreFixture {
         if fault == .missingColumn || fault == .extraColumn || fault == .reorderedColumn || fault == .wrongType || fault == .defaultValue || fault == .notNull || fault == .wrongPrimaryKey {
             return Self(root: root, databaseURL: databaseURL)
         }
+        let insertSQL = "INSERT INTO ZCLOUDRECORDING VALUES (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, ?, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'x', ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL)"
         for (index, row) in inserted.enumerated() {
-            let sortingTitle = fault == .emptyTitle ? "" : row.title
-            let encryptedTitle = fault == .titleMismatch ? "Other title" : sortingTitle
-            let eviction: String
-            switch fault {
-            case .integerEviction: eviction = "1"
-            case .textEviction: eviction = "'invalid'"
-            default: eviction = row.eviction == .null ? "NULL" : "1.5"
+            if fault == .invalidUTF8ID {
+                let sql = "INSERT INTO ZCLOUDRECORDING VALUES (\(index + 1), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'x', '\(row.title)', '\(row.title)', '\(row.path)', CAST(X'ff' AS TEXT), NULL, NULL, NULL, NULL, NULL)"
+                guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw FixtureError.failed }
+                continue
             }
-            let id = fault == .invalidUTF8ID ? "CAST(X'ff' AS TEXT)" : "'\(row.id)'"
-            let sql = "INSERT INTO ZCLOUDRECORDING VALUES (\(index + 1), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, \(eviction), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'x', '\(sortingTitle)', '\(encryptedTitle)', '\(row.path)', \(id), NULL, NULL, NULL, NULL, NULL)"
-            guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else { throw FixtureError.failed }
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK, let statement else { throw FixtureError.failed }
+            defer { sqlite3_finalize(statement) }
+            let sortingTitle = fault == .emptyTitle ? "" : row.title
+            let encryptedTitle = fault == .titleMismatch ? "Other title" : row.encryptedTitle
+            guard sqlite3_bind_int64(statement, 1, sqlite3_int64(index + 1)) == SQLITE_OK else { throw FixtureError.failed }
+            switch fault {
+            case .integerEviction:
+                guard sqlite3_bind_int(statement, 2, 1) == SQLITE_OK else { throw FixtureError.failed }
+            case .textEviction:
+                guard bindUTF8(statement, 2, "invalid") == SQLITE_OK else { throw FixtureError.failed }
+            default:
+                switch row.eviction {
+                case .null:
+                    guard sqlite3_bind_null(statement, 2) == SQLITE_OK else { throw FixtureError.failed }
+                case .real:
+                    guard sqlite3_bind_double(statement, 2, 1.5) == SQLITE_OK else { throw FixtureError.failed }
+                case .integer:
+                    guard sqlite3_bind_int(statement, 2, 1) == SQLITE_OK else { throw FixtureError.failed }
+                }
+            }
+            guard bindUTF8(statement, 3, sortingTitle) == SQLITE_OK,
+                  bindUTF8(statement, 4, encryptedTitle) == SQLITE_OK,
+                  bindUTF8(statement, 5, row.path) == SQLITE_OK,
+                  bindUTF8(statement, 6, row.id) == SQLITE_OK,
+                  sqlite3_step(statement) == SQLITE_DONE
+            else { throw FixtureError.failed }
         }
+
         return Self(root: root, databaseURL: databaseURL)
     }
     func cleanup() { try? FileManager.default.removeItem(at: root) }
     private enum FixtureError: Error { case failed }
+}
+
+private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+private func bindUTF8(_ statement: OpaquePointer, _ index: Int32, _ value: String) -> Int32 {
+    Array(value.utf8).withUnsafeBufferPointer { buffer in
+        sqlite3_bind_text(
+            statement,
+            index,
+            buffer.baseAddress.map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) },
+            Int32(buffer.count),
+            sqliteTransient
+        )
+    }
+}
+
+enum UnicodeExactFixture {
+    static let nfcEAcute = String(bytes: [0xC3, 0xA9], encoding: .utf8)!
+    static let nfdEAcute = String(bytes: [0x65, 0xCC, 0x81], encoding: .utf8)!
 }

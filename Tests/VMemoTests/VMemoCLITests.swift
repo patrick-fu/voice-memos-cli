@@ -87,16 +87,16 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual(uiJSON.status, exitStatus(for: uiReport.status))
     }
 
-    func testRenameFailsClosedWhenSystemMutationAdapterIsUnconfigured() throws {
+    func testRenameFailsClosedWhenSystemMutationPreflightIsUnavailable() throws {
         let result = try runVMemo("rename", "--id", "opaque-recording-id", "--title", "Renamed", "--token", "fixture-token", "--confirm", "--json")
 
         XCTAssertEqual(result.status, 4)
         XCTAssertEqual(result.stdout, "")
         let envelope = try decodeJSON(result.stderr)
-        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "adapter_not_configured")
+        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, systemMutationFailureCode)
     }
 
-    func testRenameAndDeleteAcceptDryRunFlagsAndFailClosedWithoutAnAdapter() throws {
+    func testRenameAndDeleteAcceptDryRunFlagsAndFailClosedBeforeAnySystemMutation() throws {
         let rename = try runVMemo("rename", "--id", "opaque-recording-id", "--title", "Renamed", "--dry-run", "--json")
         let delete = try runVMemo("delete", "--id", "opaque-recording-id", "--dry-run", "--json")
 
@@ -104,7 +104,7 @@ final class VMemoCLITests: XCTestCase {
             XCTAssertEqual(result.status, 4)
             XCTAssertEqual(result.stdout, "")
             let envelope = try decodeJSON(result.stderr)
-            XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "adapter_not_configured")
+            XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, systemMutationFailureCode)
         }
     }
 
@@ -311,6 +311,7 @@ final class VMemoCLITests: XCTestCase {
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
         environment["VMEMO_RECORDINGS_ROOT"] = fixtureRoot.path
+        environment["VMEMO_MUTATION_TOKEN_ROOT"] = fixtureRoot.appendingPathComponent("tokens", isDirectory: true).path
         process.environment = environment
         process.standardOutput = stdout
         process.standardError = stderr
@@ -350,6 +351,12 @@ final class VMemoCLITests: XCTestCase {
         case "incomplete": 5
         default: -1
         }
+    }
+
+    private var systemMutationFailureCode: String {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26
+            ? "snapshot_creation_failed"
+            : "mutation_preflight_failed"
     }
 }
 

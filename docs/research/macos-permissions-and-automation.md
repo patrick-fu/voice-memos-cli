@@ -12,7 +12,7 @@
 | 能力 | 决策 | 条件 |
 | --- | --- | --- |
 | `list/search/show/export` | **Blocked** | schema、state predicate 与资产语义尚未完成 disposable 验证；production read 保持 fail closed。FDA 不是已证明的最小或唯一可行授权。 |
-| `rename/delete` | **Blocked（production）** | Issue #26 仅证明 disposable UI mutation 的可行性；production 仍需 Accessibility、opaque-ID/UI-tuple 映射、token、显式确认和逐条 pre/post verification。 |
+| `rename/delete` | **已接线，当前 fail closed** | production coordinator 已要求 Accessibility、opaque-ID/UI tuple、持久 token、显式确认及逐条 fresh pre/post verification。synthetic AX manifest 与 typed actions 已有，但 live rows fully realized 尚无证据，production preflight（通常 `virtualizedAmbiguity`）拒绝且不执行 UI action。 |
 | 打开 Voice Memos、人工操作 | **Go（辅助路径）** | 可用于用户自行完成操作，但不是 `rename/delete` 命令的替代后端。 |
 | System Events/JXA UI scripting | **No-Go（默认实现）** | 它增加 Apple Events/Automation 面；尚无证据证明它能免除 Accessibility。仅可作为单独、后续实验证明的兼容后备。 |
 | 直接改 Voice Memos SQLite、资源或 CloudKit mirror | **No-Go** | FDA 只解决文件可读性，不提供 Core Data、`voicememod`、CloudKit 或 Recently Deleted 的一致性契约。 |
@@ -22,7 +22,7 @@
 
 `list`、`search`、`show`、`export`、`rename` 和 `delete` 都是 v0.1 的正常命令；权限、preflight 或确认不满足时返回明确错误，而不是把命令隐藏或改名。
 
-未来在 token-confirmed mutation 通过完整验证后，才考虑无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read/mutation 保持 blocked；v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
+待 live AX rows fully realized 与 manifest 证据通过完整验证后，才考虑实际 token-confirmed 与无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read 仅在 exact build gate 下启用；mutation 已接线但保持 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
 
 ## 权限矩阵
 
@@ -110,15 +110,17 @@ Apple 没有承诺锁屏、无 console GUI login、SSH、CI、LaunchDaemon 或�
 
 ## `rename/delete` 执行协议（v0.1 contract）
 
-`rename` 和 `delete` 的唯一候选写后端是原生 `AXUIElement`；Issue #26 的 disposable 结果不构成 production 授权。它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 作为 silent fallback；在 state predicate、opaque-ID/UI-tuple 映射和完整 pre/post 验证完成前保持 blocked。
+`rename` 和 `delete` 的唯一写后端是原生 `AXUIElement`；它们不是私有 SQLite/asset/CloudKit 写入，也不允许 System Events/JXA 作为 silent fallback。协调器使用持久化、跨进程原子消费的 30 秒 token；记录只保留 request/source/AX/environment 的 SHA-256，根目录为 `~/Library/Application Support/vmemo/mutation-authorizations`，只在 mutation 首次尝试时惰性创建。session lock 覆盖 fresh resolver snapshot、AX verification、consume、action 与 DB/AX postcondition；action 或任一 postcondition 不确定后 token 仍不可重放。synthetic manifest 与 typed actions 已实现；live rows fully realized 仍未验证，因此 production preflight fail closed，不触发 action。
+
+**Store 信任边界：**0700 root、0600 records 和 `O_NOFOLLOW` 验证可拒绝 symlink、hardlink、FIFO、损坏记录等 hostile path node；跨进程 exactly-once 针对正常或竞争进程。它信任同 UID 进程及父目录：能替换整个 0700 root 的同 UID 恶意代码不在此威胁模型内，不能宣称 token/session store 可抵御该情形。
 
 1. 命令先对每个请求的 Recording 建立一次性、短时有效的 opaque target token；token 绑定本次动作、目标的 fresh UI verification 和环境指纹，不能从 Title、列表 index 或旧 UI element 推导。
 2. mutation 必须提供该 token 和显式确认。交互模式可要求用户输入确认；`--json`/非交互模式必须显式传入确认参数，且**不得**调用 `AXIsProcessTrustedWithOptions` 的 prompt option、显示确认窗口或任何 TCC 授权 UI。权限未满足时返回机器可读拒绝，留给用户在系统设置完成授权后重试。
 3. 每条 action 都在按压前 fresh pre-verification：重新定位 Voice Memos、窗口和唯一目标，验证 token 仍匹配、焦点/模态状态符合预期；按压后做 fresh post-verification。无法证明预期状态转变即返回失败，不能以“未报错”视为成功。
-4. batch 接受批量输入，但严格串行执行；每条都独立消费 token、完成 fresh pre/post verification。任一歧义、焦点漂移、权限变化、超时或 post-verification 失败立即停止后续项目，并以机器可读 partial result（至少含 `status: "partial"`、`completed`、`failed`、`notAttempted` 和稳定错误码）返回；不得并行或继续猜测。
+4. v0.1 只提供 flat 的单 Recording 命令；不接受 batch 输入或返回 partial result。
 5. `delete` 只在已验证的 **All Recordings** view 按原生 Voice Memos UI 的 **Delete** 语义把 Active Recording 移入 Recently Deleted；若当前 view 是 Recently Deleted，必须拒绝，避免触发 Permanent Delete 确认。Permanent Delete、全部删除、清空 Recently Deleted 和任何不可恢复删除均在 v0.1 scope 外，命令永不调用或模拟这些 UI action。
 
-**后续条件：**满足上述 token、显式确认、可验证 UI 状态和串行验证条件后，才可评估非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。当前 production mutation 仍 blocked。
+**后续条件：**需验证 live AX rows fully realized 与 manifest 证据后，才可实际执行 token-confirmed mutation 并评估非交互或无人值守调用。CLI 不额外要求用户证明屏幕处于解锁状态；JSON 模式仍不得弹窗、请求 TCC 授权或绕过任一 preflight。
 
 ## Doctor、拒绝处理与失败关闭
 
@@ -148,7 +150,7 @@ standalone executable 是否可由 `tccutil` 的 identity 参数精确匹配仍�
 ### 统一 fail-closed 规则
 
 - 只读：权限、schema、snapshot 一致性、资产本地化任一失败即不输出部分/陈旧结果；绝不为了“修复”写数据库或启动 UI automation。
-- mutation：权限、GUI session、App/窗口、唯一目标、token、显式确认、预期 action、fresh pre/post verification 任一失败即不执行或立即停止；不按 element index 猜目标，不回退 System Events/私有 SQL。batch 严格串行，遇到歧义或焦点漂移立即停止并返回机器可读 partial result，绝不跳过失败项继续执行。
+- mutation：权限、GUI session、App/窗口、唯一目标、token、显式确认、预期 action、fresh pre/post verification 任一失败即不执行；不按 element index 猜目标，不回退 System Events/私有 SQL。v0.1 不支持 batch。
 - 日志：只记录 capability state、错误域/码、版本和签名 identity；不记录 Recording ID、Title、路径、音频、转写或数据库值。
 
 ## 验收测试清单（只在隔离账户/可丢弃录音中执行）
@@ -165,7 +167,6 @@ standalone executable 是否可由 `tccutil` 的 identity 参数精确匹配仍�
 | 前台、锁屏、无 GUI login、Voice Memos 未运行/有 modal/无响应 | 不按 session 标签预先判定；逐项运行 UI 可达性与完整 token + fresh pre/post verification。能证明目标与结果才执行，否则安全停止，不尝试唤醒、解锁或绕过系统边界。 |
 | System Events/JXA（若以后实现）Automation Allow/Deny/reset | 验证调用者 identity、usage string、entitlement、System Events/AX 归属和取消码；结果不满足可机器判定即移除 backend。 |
 | AX rename/delete 单条、同名/排序变更/语言变更/UI 改版 | 操作前后按 token 绑定的受验证属性重新定位；显式确认后，歧义、元素变化、结果不可核验均停止。删除只验证原生 Recently Deleted UI 语义；Permanent Delete 不在 scope 内。 |
-| AX rename/delete batch | 输入可含多项；严格串行，每条都 fresh pre/post verification。首个歧义/焦点漂移/失败后停止，JSON 返回 stable-code partial result。 |
 | 签名、公证、升级/Homebrew reinstall | `codesign`/`spctl` 检查通过；重新验证 TCC identity，而不是假定旧 grant 延续。 |
 
 ## 可复现的无用户数据静态检查
