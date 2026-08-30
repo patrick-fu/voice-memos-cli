@@ -65,8 +65,7 @@ final class SnapshottingRecordingReadPortTests: XCTestCase {
 
         let result = CommandRunner(
             read: read,
-            asset: UnconfiguredAssetPort(),
-            write: UnconfiguredWritePort()
+            asset: UnconfiguredAssetPort()
         ).run(.list, output: .json)
         XCTAssertEqual(result.exitCode, ProcessExit.safetyFailure.rawValue)
         XCTAssertTrue(result.stderr.contains("snapshot_creation_failed"))
@@ -87,8 +86,7 @@ final class SnapshottingRecordingReadPortTests: XCTestCase {
 
         let result = CommandRunner(
             read: read,
-            asset: UnconfiguredAssetPort(),
-            write: UnconfiguredWritePort()
+            asset: UnconfiguredAssetPort()
         ).run(.list, output: .json)
         XCTAssertEqual(result.exitCode, ProcessExit.safetyFailure.rawValue)
         XCTAssertTrue(result.stderr.contains("snapshot_cleanup_failed"))

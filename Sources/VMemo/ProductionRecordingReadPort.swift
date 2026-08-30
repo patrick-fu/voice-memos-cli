@@ -35,7 +35,7 @@ struct ProductionRecordingReadPort: RecordingReadPort, RecordingAssetReferenceRe
 enum SystemProductionAdapterFactory {
     static func makeRunner() -> CommandRunner {
         guard let configuration = configuration() else {
-            return CommandRunner(read: UnsupportedProductionReadPort(), asset: UnsupportedProductionAssetPort(), write: UnsupportedProductionWritePort(), doctor: SystemDoctorPort())
+            return CommandRunner(read: UnsupportedProductionReadPort(), asset: UnsupportedProductionAssetPort(), doctor: SystemDoctorPort())
         }
         let read = ProductionRecordingReadPort(
             source: configuration.recordingsRoot.appendingPathComponent("CloudRecordings.db"),
@@ -47,32 +47,8 @@ enum SystemProductionAdapterFactory {
         return CommandRunner(
             read: read,
             asset: SafeRecordingAssetPort(recordingsRoot: configuration.recordingsRoot, resolver: read),
-            write: ProductionMutationWritePort(
-                resolver: FreshProductionMutationResolver(
-                    source: configuration.recordingsRoot.appendingPathComponent("CloudRecordings.db"),
-                    destinationRoot: FileManager.default.temporaryDirectory,
-                    snapshot: SQLiteSnapshotAdapter(),
-                    identity: configuration.identity,
-                    metadataReader: CoreDataPersistentStoreMetadataReader(model: configuration.model)
-                ),
-                accessibility: NativeVoiceMemosAccessibility(driver: SystemVoiceMemosAXDriver()),
-                tokenStoreFactory: FilePersistentMutationTokenStoreFactory(rootDirectory: mutationTokenRoot(environment: ProcessInfo.processInfo.environment)),
-                clock: SystemMutationClock(),
-                nonceGenerator: SystemMutationNonceGenerator(),
-                environment: SystemMutationEnvironmentFingerprint()
-            ),
             doctor: SystemDoctorPort()
         )
-    }
-
-    private static func mutationTokenRoot(environment: [String: String]) -> URL {
-        // This override is only for hermetic test subprocesses. The directory remains uncreated
-        // until a mutation attempts to acquire its authorization session.
-        if let overridden = environment["VMEMO_MUTATION_TOKEN_ROOT"], !overridden.isEmpty {
-            return URL(fileURLWithPath: overridden, isDirectory: true)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/vmemo/mutation-authorizations", isDirectory: true)
     }
 
     static func configuration(artifacts: any ProductionSystemArtifacts = SystemProductionArtifacts()) -> (recordingsRoot: URL, identity: RealSchemaIdentity, model: NSManagedObjectModel)? {
@@ -145,14 +121,4 @@ private struct UnsupportedProductionReadPort: RecordingReadPort {
 
 private struct UnsupportedProductionAssetPort: RecordingAssetPort {
     func export(id: RecordingID, destination: String) throws -> ExportReceipt { throw ProductionRecordingAdapterError.unsupportedSchema }
-}
-
-private struct UnsupportedProductionWritePort: RecordingWritePort {
-    func dryRun(_ request: MutationRequest) throws -> MutationPlan {
-        throw ProductionMutationWriteError.preflightFailed
-    }
-
-    func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult {
-        throw ProductionMutationWriteError.preflightFailed
-    }
 }

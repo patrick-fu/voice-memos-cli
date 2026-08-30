@@ -7,7 +7,7 @@ final class SchemaAdapterTests: XCTestCase {
             revision: .macOS15,
             records: [
                 .init(id: "11111111-1111-1111-1111-111111111111", title: "First", isActive: 1),
-                .init(id: "22222222-2222-2222-2222-222222222222", title: "Deleted", isActive: 0),
+                .init(id: "22222222-2222-2222-2222-222222222222", title: "Inactive", isActive: 0),
             ]
         )
         defer { try? fixture.cleanup() }

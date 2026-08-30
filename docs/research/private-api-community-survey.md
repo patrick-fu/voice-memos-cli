@@ -1,5 +1,7 @@
 # macOS Voice Memos 私有 API 与社区实现调研
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-28；范围仅限 `list/search/show/export/rename/delete`。未读取或修改本机 Voice Memos 用户容器、未调用 XPC、未注入、未运行社区脚本。**转写不作为能力依据**，只在项目矩阵与 `.m4a/.qta` 资产格式风险中标明边界，不讨论转写或回写设计。
 
 ## 结论摘要

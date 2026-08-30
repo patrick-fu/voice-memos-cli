@@ -1,5 +1,7 @@
 # 社区 Voice Memos 实现模式（源码核验）
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-30。工作目录 `/Volumes/WD/code/github/voice-memos-cli`。只读公开 GitHub/gist 源码；**未读取或修改本机 Voice Memos 用户数据**。版本一律用当时 default branch HEAD SHA 或 gist history 固定 revision。
 
 本文不复述 [private-api-community-survey.md](private-api-community-survey.md) 的 XPC/entitlement 结论，也不复述 [voice-memos-mutation-alternatives.md](voice-memos-mutation-alternatives.md) 对本机 build 1380 的 AX/`CGEvent`/App Intents 否证。焦点是：**社区代码实际怎么定位、怎么写、怎么验、测了什么**。

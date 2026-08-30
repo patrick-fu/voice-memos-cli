@@ -1,13 +1,17 @@
 # macOS 权限与自动化约束（v0.1）
 
-研究日期：2026-08-28。目标是为一个独立分发、可经 Homebrew 安装、使用 Developer ID 签名的 Swift CLI，划定两条能力的权限和运行边界：
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。后续还出现的 `doctor --ui`、AX/token/rename/delete 执行协议均属旧研究设计或未采纳方案，不代表当前 CLI 接口。
+
+研究日期：2026-08-28。最初目标是为一个独立分发、可经 Homebrew 安装、使用 Developer ID 签名的 Swift CLI，研究两条能力的权限和运行边界：
 
 - 只读访问 Voice Memos 的私有本地数据，以实现 `list/search/show/export`；
 - 用 `AXUIElement` 驱动已验证的 Voice Memos UI mutation，而**不**写私有数据库。
 
 本研究没有读取录音、标题、转写、数据库行或任何 Voice Memos 用户容器；本机检查只读系统 SDK、系统 app、签名元数据和 launchd plist。下文的“已证实”只表示引用资料或静态检查实际证明的事实；“推论”是据此作出的产品判断；“待实机验证”不得作为 v0.1 承诺。
 
-## v0.1 决策
+## 已废止的早期 v0.1 决策
+
+本节记录当时评估过但最终未采纳的 mutation 产品设计。当前有效结论只有只读 `list/search/show/export/doctor`；下表及后续 AX/token 执行协议不得用作当前接口或实现依据。
 
 | 能力 | 决策 | 条件 |
 | --- | --- | --- |
@@ -18,9 +22,9 @@
 | 直接改 Voice Memos SQLite、资源或 CloudKit mirror | **No-Go** | FDA 只解决文件可读性，不提供 Core Data、`voicememod`、CloudKit 或 Recently Deleted 的一致性契约。 |
 | 私有 XPC/framework | **No-Go** | 当前没有普通 Developer ID CLI 的公开协议、授权或兼容性契约。详见已有[私有 API 调研](private-api-community-survey.md)。 |
 
-**最小推荐架构：**一个非沙盒、Developer ID 签名并公证的单一 CLI；只读 adapter 与 AX mutation adapter 物理分开。`rename/delete` 只能走原生 AX adapter，必须消费一次性 target token 并接受显式确认；JSON 非交互模式不得弹出确认或 TCC 授权请求。不要让 `list` 或数据库 adapter 触发 Accessibility、Apple Events、启动 App 或 mutation。不要以 FDA、Accessibility 或 Automation 中任何一个代替另一个。
+**旧架构（已废止）：**曾考虑让非沙盒、Developer ID 签名并公证的单一 CLI 同时承载只读 adapter 与 AX mutation adapter，并用一次性 token、显式确认和 fresh verification 约束 `rename/delete`。该架构没有进入当前产品；现有生产代码不包含 AX adapter、mutation token 或 write port。
 
-`list`、`search`、`show`、`export`、`rename` 和 `delete` 都是 v0.1 的正常命令；权限、preflight 或确认不满足时返回明确错误，而不是把命令隐藏或改名。
+早期设计曾把 `rename/delete` 视为 v0.1 命令；该决定已被 2026-08-30 的只读范围取代。当前 help 不注册这两个命令，调用时返回 usage error。
 
 待 AX + native input synthesis 的产品边界、rename commit transition 与 action 后 postcondition 通过完整验证后，才考虑实际 token-confirmed 与无人值守执行。CLI 不根据“已解锁”“SSH”“后台”之类的 session 标签预判安全；只根据当下能否访问 Voice Memos UI、唯一证明目标并完成 fresh pre/post verification 决定执行。当前 production read 仅在 exact build gate 下启用；mutation 已接线但保持 fail closed。v0.1 不做 telemetry、网络请求或 crash upload，也不写 Voice Memos 的逻辑数据库、asset 或 CloudKit mirror。
 

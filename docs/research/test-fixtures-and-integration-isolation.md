@@ -1,10 +1,12 @@
 # 隔离 fixtures 与集成测试架构
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-28。目标是让未来 Swift CLI 能在**完全不接触真实 Voice Memos 库、iCloud 数据、用户 Shortcut 或真实 UI mutation**的条件下，构建、回归和发布。本文是 build-ready 测试设计，不是对私有 schema 的兼容承诺。
 
-## 决策
+## 当前只读测试架构与已废止的 mutation 设计
 
-**结论：**采用「合成 SQLite/Core Data-shaped fixture + 明确 ports + AX 状态机 fake + 少量签名人工验收」四层架构。CI 只运行前 3 层；所有真实 Voice Memos、TCC、iCloud、Accessibility 和 UI 行为都在隔离 macOS 用户的签名人工 gate 中验证。
+**当前结论：**采用「合成 SQLite/Core Data-shaped fixture + 明确 read/asset ports」测试只读检索与导出。下文的 AX 状态机 fake、`RecordingWritePort`、token 和 mutation 人工 gate 是早期设计，已经废止；保留仅用于说明当时的隔离边界，不代表当前源码或测试布局。
 
 | 标记 | 本文含义 |
 | --- | --- |
@@ -12,7 +14,7 @@
 | **工程推论** | 为满足项目安全契约而作的设计选择。 |
 | **需实机验证** | synthetic test 不能证明，且不得在真实用户库上验证。 |
 
-这与项目词汇一致：fixture 的 `Recording ID` 是 opaque selector，绝不由 Title、数据库 row ID 或 asset path 推导；`Delete` 只表示 Voice Memos 的 Recently Deleted 语义，永不测试或实现 Permanent Delete。[CONTEXT.md](../../CONTEXT.md)
+当前仍有效的词汇约束是：fixture 的 `Recording ID` 是 opaque selector，绝不由 Title、数据库 row ID 或 asset path 推导。[CONTEXT.md](../../CONTEXT.md)
 
 ## 证据与不可跨越边界
 

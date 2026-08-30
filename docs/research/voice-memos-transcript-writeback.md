@@ -1,5 +1,7 @@
 # Voice Memos 系统转写的读取与安全回写可行性
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-27。目标是回答第三方 CLI 能否读取 macOS Voice Memos 的系统转写，并将更强模型生成的替代转写回写到 Voice Memos 供 App 展示。
 
 本次检查**未读取录音内容、标题、转写、联系人或任何数据库记录**，也没有启动 Voice Memos、修改其容器或 iCloud 数据。下文的本机证据仅来自应用/守护进程二进制、签名、Core Data 模型、启动配置和目录存在性。

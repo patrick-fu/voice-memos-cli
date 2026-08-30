@@ -97,67 +97,6 @@ enum RecordingAssetError: Error, Equatable, Sendable {
     }
 }
 
-protocol RecordingWritePort: Sendable {
-    func dryRun(_ request: MutationRequest) throws -> MutationPlan
-    func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult
-}
-
-enum MutationOperation: Sendable, Equatable {
-    case rename(title: String)
-    case moveToRecentlyDeleted
-
-    var description: String {
-        switch self {
-        case .rename:
-            "rename"
-        case .moveToRecentlyDeleted:
-            "moveToRecentlyDeleted"
-        }
-    }
-
-    var title: String? {
-        guard case let .rename(title) = self else { return nil }
-        return title
-    }
-}
-
-struct MutationRequest: Sendable, Equatable {
-    let id: RecordingID
-    let operation: MutationOperation
-}
-
-struct MutationAuthorization: Sendable {
-    let token: String
-    let confirmed: Bool
-
-    init(token: String, confirmed: Bool) {
-        self.token = token
-        self.confirmed = confirmed
-    }
-}
-
-struct MutationPlan: Sendable, Codable {
-    let id: RecordingID
-    let operation: String
-    let confirmationToken: String
-
-    init(request: MutationRequest, confirmationToken: String) {
-        id = request.id
-        operation = request.operation.description
-        self.confirmationToken = confirmationToken
-    }
-}
-
-struct MutationResult: Sendable, Codable {
-    let id: RecordingID
-    let operation: String
-
-    init(request: MutationRequest) {
-        id = request.id
-        operation = request.operation.description
-    }
-}
-
 enum VMemoError: Error {
     case adapterNotConfigured(operation: String)
 
@@ -196,18 +135,8 @@ struct UnconfiguredAssetPort: RecordingAssetPort {
     }
 }
 
-struct UnconfiguredWritePort: RecordingWritePort {
-    func dryRun(_ request: MutationRequest) throws -> MutationPlan {
-        throw VMemoError.adapterNotConfigured(operation: request.operation.description)
-    }
-
-    func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult {
-        throw VMemoError.adapterNotConfigured(operation: request.operation.description)
-    }
-}
-
 struct UnconfiguredDoctorPort: DoctorPort {
-    func inspect(includeUI: Bool) throws -> DoctorReport {
+    func inspect() throws -> DoctorReport {
         throw VMemoError.adapterNotConfigured(operation: "doctor")
     }
 }

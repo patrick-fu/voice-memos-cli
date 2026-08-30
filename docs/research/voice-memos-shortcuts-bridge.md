@@ -1,5 +1,7 @@
 # Voice Memos 的 Shortcuts 桥接可行性（v0.1 研究）
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-27。检查环境为 macOS 26.6.1（25G76）、Voice Memos 3.2（1380）。本研究只读取系统 bundle/metadata、SDK interface、`/usr/bin/shortcuts --help`、系统 `sdef` 和 Apple 官方网页；**没有**读取快捷指令库、录音、标题、转写或数据库，也没有创建、导入、运行、删除任何 Shortcut 或 Voice Memos 数据。
 
 ## 结论

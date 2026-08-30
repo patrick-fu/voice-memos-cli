@@ -1,5 +1,7 @@
 # Voice Memos macOS 数据访问边界（v0.1 研究）
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-27。当前机器为 macOS 26.6.1（Darwin build 25G76）；按发行主版本，当前为 macOS Tahoe 26，前一主要版本为 macOS Sequoia 15。以下结论区分 Apple 公开 API、系统能力和对 Voice Memos 私有实现的实际探测；不读取录音音频、标题、转写或其他个人字段值。
 
 ## 结论先行

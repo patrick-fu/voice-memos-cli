@@ -7,7 +7,7 @@ final class ProductionRecordingAdapterTests: XCTestCase {
     func testExactSchemaProjectsOnlyActiveRowsAndUsesOpaqueIDs() throws {
         let fixture = try ProductionStoreFixture.make(rows: [
             .init(id: "opaque-active", title: "Fixture title", path: "audio.m4a", eviction: .null),
-            .init(id: "opaque-deleted", title: "Deleted title", path: "deleted.m4a", eviction: .real(1)),
+            .init(id: "opaque-inactive", title: "Inactive title", path: "inactive.m4a", eviction: .real(1)),
         ])
         defer { fixture.cleanup() }
         let adapter = ProductionRecordingAdapter(snapshotURL: fixture.databaseURL)
@@ -15,15 +15,15 @@ final class ProductionRecordingAdapterTests: XCTestCase {
         XCTAssertEqual(try adapter.list(), [RecordingSummary(id: RecordingID(value: "opaque-active"), title: "Fixture title")])
         XCTAssertEqual(try adapter.search(query: "FIXTURE").count, 1)
         XCTAssertEqual(try adapter.assetReference(for: RecordingID(value: "opaque-active")), "audio.m4a")
-        XCTAssertThrowsError(try adapter.show(id: RecordingID(value: "opaque-deleted"))) { error in
+        XCTAssertThrowsError(try adapter.show(id: RecordingID(value: "opaque-inactive"))) { error in
             XCTAssertEqual(error as? ProductionRecordingAdapterError, .recordingNotFound)
         }
-        XCTAssertThrowsError(try adapter.assetReference(for: RecordingID(value: "opaque-deleted"))) { error in
+        XCTAssertThrowsError(try adapter.assetReference(for: RecordingID(value: "opaque-inactive"))) { error in
             XCTAssertEqual(error as? ProductionRecordingAdapterError, .recordingNotFound)
         }
 
         let projection = try adapter.validatedProjection()
-        XCTAssertEqual(projection.recordings.map(\.id.value), ["opaque-active", "opaque-deleted"])
+        XCTAssertEqual(projection.recordings.map(\.id.value), ["opaque-active", "opaque-inactive"])
         XCTAssertEqual(projection.recordings.map(\.isActive), [true, false])
         XCTAssertEqual(projection.fingerprint.count, 64)
         XCTAssertFalse(projection.fingerprint.contains("opaque-active"))
@@ -97,15 +97,14 @@ final class ProductionRecordingAdapterTests: XCTestCase {
         XCTAssertTrue(utf8ExactEqual(nfd.title, "Second title"))
     }
 
-    func testDeletedExportReturnsStableNotFoundCode() throws {
-        let fixture = try ProductionStoreFixture.make(rows: [.init(id: "opaque-deleted", title: "Fixture title", path: "deleted.m4a", eviction: .real(1.5))])
+    func testInactiveExportReturnsStableNotFoundCode() throws {
+        let fixture = try ProductionStoreFixture.make(rows: [.init(id: "opaque-inactive", title: "Fixture title", path: "inactive.m4a", eviction: .real(1.5))])
         defer { fixture.cleanup() }
         let adapter = ProductionRecordingAdapter(snapshotURL: fixture.databaseURL)
         let result = CommandRunner(
             read: adapter,
-            asset: SafeRecordingAssetPort(recordingsRoot: fixture.root, resolver: adapter),
-            write: UnconfiguredWritePort()
-        ).run(.export(id: RecordingID(value: "opaque-deleted"), destination: "/tmp/vmemo-production-export.m4a"), output: .json)
+            asset: SafeRecordingAssetPort(recordingsRoot: fixture.root, resolver: adapter)
+        ).run(.export(id: RecordingID(value: "opaque-inactive"), destination: "/tmp/vmemo-production-export.m4a"), output: .json)
 
         XCTAssertEqual(result.exitCode, ProcessExit.operationalFailure.rawValue)
         XCTAssertTrue(result.stderr.contains("recording_not_found"))

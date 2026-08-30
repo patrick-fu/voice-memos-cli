@@ -8,7 +8,7 @@ final class VMemoCLITests: XCTestCase {
 
         XCTAssertEqual(result.status, 0)
         XCTAssertEqual(result.stderr, "")
-        for command in ["list", "search", "show", "export", "rename", "delete", "doctor"] {
+        for command in ["list", "search", "show", "export", "doctor"] {
             XCTAssertTrue(result.stdout.contains(command), "missing command: \(command)")
         }
     }
@@ -20,13 +20,13 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertTrue(rootHelp.contains("version 1 JSON envelope"))
         XCTAssertTrue(rootHelp.contains("Exit codes: 0 success, 2 usage error, 3 operational/output error, 4 safety or adapter block, 5 partial/incomplete result."))
         XCTAssertTrue(rootHelp.contains("Recording IDs are opaque"))
-        XCTAssertTrue(rootHelp.contains("delete moves a recording to Recently Deleted"))
+        for forbidden in ["rename", "delete", "mutation", "token", "confirm", "accessibility"] {
+            XCTAssertFalse(rootHelp.localizedCaseInsensitiveContains(forbidden), "forbidden term in help: \(forbidden)")
+        }
 
         let helpCases: [(String, [String])] = [
-            ("rename", ["USAGE: vmemo rename", "--dry-run", "--token <token> --confirm", "payload change invalidates the token", "Example: vmemo rename"]),
-            ("delete", ["USAGE: vmemo delete", "Recently Deleted", "--dry-run", "--token <token> --confirm", "payload change invalidates the token", "Example: vmemo delete"]),
             ("export", ["USAGE: vmemo export", "must not already exist", "source recording is never modified", "Example: vmemo export"]),
-            ("doctor", ["USAGE: vmemo doctor", "does not check Accessibility", "--ui", "never prompts", "Example: vmemo doctor"]),
+            ("doctor", ["USAGE: vmemo doctor", "Check runtime, application, library, schema, and signing readiness.", "Example: vmemo doctor"]),
         ]
         for (command, sections) in helpCases {
             let result = try runVMemo(command, "--help")
@@ -44,9 +44,7 @@ final class VMemoCLITests: XCTestCase {
             ["search", "--query", "meeting", "--json"],
             ["show", "--id", "opaque-recording-id", "--json"],
             ["export", "--id", "opaque-recording-id", "--output-path", "/tmp/vmemo-example.m4a", "--json"],
-            ["rename", "--id", "opaque-recording-id", "--title", "New title", "--dry-run", "--json"],
-            ["delete", "--id", "opaque-recording-id", "--dry-run", "--json"],
-            ["doctor", "--ui", "--json"],
+            ["doctor", "--json"],
         ]
         for arguments in examples {
             let result = try runVMemo(arguments)
@@ -68,7 +66,7 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, expectedCode)
     }
 
-    func testDoctorSubprocessWritesAReportForHumanJSONAndExplicitUIModes() throws {
+    func testDoctorSubprocessWritesAReportForHumanAndJSONModes() throws {
         let human = try runVMemo("doctor")
         XCTAssertEqual(human.stderr, "")
         XCTAssertTrue(human.stdout.hasPrefix("Doctor: "))
@@ -80,43 +78,25 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual(jsonReport.checks, ["runtime", "voice_memos", "library", "schema", "signing"])
         XCTAssertEqual(json.status, exitStatus(for: jsonReport.status))
 
-        let uiJSON = try runVMemo("doctor", "--ui", "--json")
-        XCTAssertEqual(uiJSON.stderr, "")
-        let uiReport = try doctorReport(from: uiJSON)
-        XCTAssertEqual(uiReport.checks, ["runtime", "voice_memos", "library", "schema", "signing", "ui_accessibility"])
-        XCTAssertEqual(uiJSON.status, exitStatus(for: uiReport.status))
     }
 
-    func testRenameFailsClosedWhenSystemMutationPreflightIsUnavailable() throws {
-        let result = try runVMemo("rename", "--id", "opaque-recording-id", "--title", "Renamed", "--token", "fixture-token", "--confirm", "--json")
+    func testRemovedWriteAndUICommandsUseVersionedUsageError() throws {
+        let argumentCases = [
+            ["unknown-command", "--json"],
+            ["rename", "--json"],
+            ["delete", "--json"],
+            ["doctor", "--ui", "--json"],
+        ]
 
-        XCTAssertEqual(result.status, 4)
-        XCTAssertEqual(result.stdout, "")
-        let envelope = try decodeJSON(result.stderr)
-        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, systemMutationFailureCode)
-    }
-
-    func testRenameAndDeleteAcceptDryRunFlagsAndFailClosedBeforeAnySystemMutation() throws {
-        let rename = try runVMemo("rename", "--id", "opaque-recording-id", "--title", "Renamed", "--dry-run", "--json")
-        let delete = try runVMemo("delete", "--id", "opaque-recording-id", "--dry-run", "--json")
-
-        for result in [rename, delete] {
-            XCTAssertEqual(result.status, 4)
-            XCTAssertEqual(result.stdout, "")
+        for arguments in argumentCases {
+            let result = try runVMemo(arguments)
+            XCTAssertEqual(result.status, 2, "arguments: \(arguments)")
+            XCTAssertEqual(result.stdout, "", "arguments: \(arguments)")
             let envelope = try decodeJSON(result.stderr)
-            XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, systemMutationFailureCode)
+            XCTAssertEqual(envelope["version"] as? Int, 1, "arguments: \(arguments)")
+            XCTAssertEqual(envelope["status"] as? String, "error", "arguments: \(arguments)")
+            XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "usage_error", "arguments: \(arguments)")
         }
-    }
-
-    func testJSONUsageErrorUsesVersionedEnvelopeAndUsageExit() throws {
-        let result = try runVMemo("rename", "--json")
-
-        XCTAssertEqual(result.status, 2)
-        XCTAssertEqual(result.stdout, "")
-        let envelope = try decodeJSON(result.stderr)
-        XCTAssertEqual(envelope["version"] as? Int, 1)
-        XCTAssertEqual(envelope["status"] as? String, "error")
-        XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "usage_error")
     }
 
     func testJSONSuccessEnvelopeKeepsDataSeparateFromProtocolFields() throws {
@@ -132,10 +112,10 @@ final class VMemoCLITests: XCTestCase {
     func testRecordingIDKeepsItsOpaqueValueIndependentOfTitle() {
         let id = RecordingID(value: "recording:9B59C5")
         let first = RecordingSummary(id: id, title: "Meeting")
-        let renamed = RecordingSummary(id: id, title: "Renamed")
+        let updatedTitle = RecordingSummary(id: id, title: "Updated")
 
         XCTAssertEqual(first.id.description, "recording:9B59C5")
-        XCTAssertEqual(first.id, renamed.id)
+        XCTAssertEqual(first.id, updatedTitle.id)
         XCTAssertNotEqual(first.id, RecordingID(value: first.title))
     }
 
@@ -144,8 +124,7 @@ final class VMemoCLITests: XCTestCase {
         let calls = CallLog()
         let runner = CommandRunner(
             read: FixtureReadPort(recordings: [recording], calls: calls),
-            asset: FixtureAssetPort(calls: calls),
-            write: FixtureWritePort(calls: calls)
+            asset: FixtureAssetPort(calls: calls)
         )
 
         let result = runner.run(.list, output: .json)
@@ -160,74 +139,34 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual(recordings[0]["id"] as? String, "recording:fixture")
     }
 
-    func testCommandRunnerRoutesEveryBusinessCommandThroughItsPort() throws {
+    func testCommandRunnerRoutesEveryReadOnlyCommandThroughItsPort() throws {
         let calls = CallLog()
         let runner = CommandRunner(
             read: FixtureReadPort(recordings: [], calls: calls),
-            asset: FixtureAssetPort(calls: calls),
-            write: FixtureWritePort(calls: calls)
+            asset: FixtureAssetPort(calls: calls)
         )
         let id = RecordingID(value: "recording:fixture")
-        let rename = MutationRequest(id: id, operation: .rename(title: "Renamed"))
-        let delete = MutationRequest(id: id, operation: .moveToRecentlyDeleted)
 
         let results = [
             runner.run(.list, output: .json),
             runner.run(.search(query: "fixture"), output: .json),
             runner.run(.show(id: id), output: .json),
-            runner.run(.export(id: id, destination: "/tmp/export.m4a"), output: .json),
-            runner.run(.mutation(request: rename, dryRun: true, token: nil, confirmed: false), output: .json),
-            runner.run(.mutation(request: delete, dryRun: false, token: "fixture-token", confirmed: true), output: .json),
+            runner.run(.export(id: id, destination: "/tmp/export.m4a"), output: .json)
         ]
 
-        XCTAssertEqual(results.map(\.exitCode), Array(repeating: 0, count: 6))
+        XCTAssertEqual(results.map(\.exitCode), Array(repeating: 0, count: 4))
         XCTAssertEqual(calls.values, [
             "list",
             "search:fixture",
             "show:recording:fixture",
-            "export:recording:fixture:/tmp/export.m4a",
-            "dryRun:rename:recording:fixture:Renamed",
-            "execute:moveToRecentlyDeleted:recording:fixture:fixture-token",
+            "export:recording:fixture:/tmp/export.m4a"
         ])
-        let dryRunEnvelope = try decodeJSON(results[4].stdout)
-        let dryRunData = try XCTUnwrap(dryRunEnvelope["data"] as? [String: Any])
-        XCTAssertEqual(dryRunData["confirmationToken"] as? String, "fixture-token")
-    }
-
-    func testMutationAuthorizationFailuresDoNotCallWritePort() throws {
-        let calls = CallLog()
-        let runner = CommandRunner(
-            read: FixtureReadPort(recordings: [], calls: calls),
-            asset: FixtureAssetPort(calls: calls),
-            write: FixtureWritePort(calls: calls)
-        )
-        let request = MutationRequest(
-            id: RecordingID(value: "recording:fixture"),
-            operation: .moveToRecentlyDeleted
-        )
-
-        let missingToken = runner.run(.mutation(request: request, dryRun: false, token: nil, confirmed: true), output: .json)
-        let missingConfirmation = runner.run(.mutation(request: request, dryRun: false, token: "fixture-token", confirmed: false), output: .json)
-        let mixedModes = runner.run(.mutation(request: request, dryRun: true, token: "fixture-token", confirmed: true), output: .json)
-
-        for result in [missingToken, missingConfirmation] {
-            XCTAssertEqual(result.exitCode, 4)
-            XCTAssertEqual(result.stdout, "")
-            let envelope = try decodeJSON(result.stderr)
-            XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "mutation_authorization_required")
-        }
-        XCTAssertEqual(mixedModes.exitCode, 4)
-        XCTAssertEqual(mixedModes.stdout, "")
-        let mixedEnvelope = try decodeJSON(mixedModes.stderr)
-        XCTAssertEqual((mixedEnvelope["error"] as? [String: Any])?["code"] as? String, "mutation_mode_conflict")
-        XCTAssertEqual(calls.values, [])
     }
 
     func testSuccessEncodingFailureReturnsOperationalErrorInsteadOfEmptySuccess() throws {
         let runner = CommandRunner(
             read: FixtureReadPort(recordings: [], calls: CallLog()),
             asset: FixtureAssetPort(calls: CallLog()),
-            write: FixtureWritePort(calls: CallLog()),
             encoder: FailingSuccessEncoder()
         )
 
@@ -246,8 +185,7 @@ final class VMemoCLITests: XCTestCase {
     func testUnknownAdapterErrorUsesOperationalEnvelopeAndExit() throws {
         let runner = CommandRunner(
             read: FailingReadPort(),
-            asset: FixtureAssetPort(calls: CallLog()),
-            write: FixtureWritePort(calls: CallLog())
+            asset: FixtureAssetPort(calls: CallLog())
         )
 
         let result = runner.run(.list, output: .json)
@@ -261,13 +199,11 @@ final class VMemoCLITests: XCTestCase {
     func testSchemaAdapterErrorsUseStableCommandFailures() throws {
         let unsupported = CommandRunner(
             read: SchemaFailingReadPort(error: .unsupportedSchema),
-            asset: FixtureAssetPort(calls: CallLog()),
-            write: FixtureWritePort(calls: CallLog())
+            asset: FixtureAssetPort(calls: CallLog())
         ).run(.list, output: .json)
         let notFound = CommandRunner(
             read: SchemaFailingReadPort(error: .recordingNotFound),
-            asset: FixtureAssetPort(calls: CallLog()),
-            write: FixtureWritePort(calls: CallLog())
+            asset: FixtureAssetPort(calls: CallLog())
         ).run(.show(id: RecordingID(value: "11111111-1111-1111-1111-111111111111")), output: .json)
 
         XCTAssertEqual(unsupported.exitCode, ProcessExit.safetyFailure.rawValue)
@@ -279,8 +215,7 @@ final class VMemoCLITests: XCTestCase {
     func testAssetErrorsUseStableCommandFailures() throws {
         let result = CommandRunner(
             read: FixtureReadPort(recordings: [], calls: CallLog()),
-            asset: FailingAssetPort(error: .pathOutsideRecordingsRoot),
-            write: FixtureWritePort(calls: CallLog())
+            asset: FailingAssetPort(error: .pathOutsideRecordingsRoot)
         ).run(
             .export(id: RecordingID(value: "recording:fixture"), destination: "/tmp/export.m4a"),
             output: .json
@@ -311,7 +246,6 @@ final class VMemoCLITests: XCTestCase {
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
         environment["VMEMO_RECORDINGS_ROOT"] = fixtureRoot.path
-        environment["VMEMO_MUTATION_TOKEN_ROOT"] = fixtureRoot.appendingPathComponent("tokens", isDirectory: true).path
         process.environment = environment
         process.standardOutput = stdout
         process.standardError = stderr
@@ -353,11 +287,6 @@ final class VMemoCLITests: XCTestCase {
         }
     }
 
-    private var systemMutationFailureCode: String {
-        ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26
-            ? "snapshot_creation_failed"
-            : "mutation_preflight_failed"
-    }
 }
 
 private struct ProcessResult {
@@ -392,20 +321,6 @@ private struct FixtureAssetPort: RecordingAssetPort {
     func export(id: RecordingID, destination: String) throws -> ExportReceipt {
         calls.append("export:\(id):\(destination)")
         return ExportReceipt(id: id, destination: destination)
-    }
-}
-
-private struct FixtureWritePort: RecordingWritePort {
-    let calls: CallLog
-
-    func dryRun(_ request: MutationRequest) throws -> MutationPlan {
-        calls.append("dryRun:\(request.operation.description):\(request.id)\(request.operation.title.map { ":\($0)" } ?? "")")
-        return MutationPlan(request: request, confirmationToken: "fixture-token")
-    }
-
-    func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult {
-        calls.append("execute:\(request.operation.description):\(request.id):\(authorization.token)")
-        return MutationResult(request: request)
     }
 }
 

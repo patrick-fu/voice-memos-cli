@@ -42,7 +42,7 @@ final class RealSchemaRecognizerTests: XCTestCase {
     }
 
     func testUnknownOSBuildModelAndChecksumsFailClosed() {
-        let mutations: [(inout RealSchemaIdentity) -> Void] = [
+        let variants: [(inout RealSchemaIdentity) -> Void] = [
             { $0.osMajor = 15 },
             { $0.osMajor = 27 },
             { $0.bundleIdentifier = "com.example.VoiceMemos" },
@@ -56,9 +56,9 @@ final class RealSchemaRecognizerTests: XCTestCase {
             { $0.runtimeEntityVersionHashesByName["CloudRecording"] = Data(repeating: 0, count: 32) },
         ]
 
-        for mutate in mutations {
+        for applyVariant in variants {
             var identity = supportedIdentity
-            mutate(&identity)
+            applyVariant(&identity)
             XCTAssertEqual(
                 recognize(identity: identity, storeMetadata: metadata(compatibleWithRuntimeModel: true)),
                 .unsupportedSchema

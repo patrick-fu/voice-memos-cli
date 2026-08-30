@@ -1,5 +1,7 @@
 # v0.1 macOS、签名与 Homebrew 分发兼容性矩阵
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。分发链条只需要覆盖只读产品所需的用户授权和安装路径，Accessibility/Apple Events 验证不属于当前产品分发范围；本文保留为历史/决策证据。
+
 研究日期：2026-08-28。目标是为 `voice-memos-cli` 的 v0.1 选择可复现的 macOS、CPU、Swift 工具链、签名/公证、GitHub Releases 与 Homebrew 发布路径。本报告只读取公开一手资料和仓库静态文件；没有读取 Voice Memos 用户数据、凭据，也没有执行签名、公证、发布或 GitHub 写操作。
 
 ## 结论先行
@@ -14,7 +16,7 @@
 | source formula / bottle | source formula 从固定源码 + `sha256` 构建；bottle 仅作为开发/性能优化，不宣称 Developer ID 签名或 Apple notarization | Homebrew 将 formula 定义为源码构建，bottle 为预编译 keg；其供应链 checksum/attestation 不等于 Apple code signature。[Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)、[Bottles](https://docs.brew.sh/Bottles) |
 | TCC/升级 | 不承诺授权随 Terminal、Homebrew symlink、Cellar 版本目录或升级迁移；固定非 bundle CLI 的 `-i` code-signing identifier，记录实际可执行文件路径，并在 15/26、Intel/Apple Silicon、ZIP/Homebrew/升级后实测 | Apple 公开接口只说明可按 service + bundle ID 重置 TCC，未给出本项目“路径/版本升级后 identity 是否继承”的合同。[Resetting access to protected resources](https://developer.apple.com/documentation/xcode/resetting-access-to-protected-resources-in-macos)、[Creating distribution-signed code](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/) |
 
-**核心判断：**正式分发是“Developer ID Application 签名 payload → Developer ID Installer signed flat PKG → notarize → staple”，并通过 GitHub immutable Release 与 own-tap cask 复用同一 PKG。裸 Mach-O ZIP 只能作为在线-ticket 辅助下载，不能承诺 offline-safe。签名、公证、Homebrew SHA-256 和 GitHub immutable release 各自解决不同问题；它们都不授予 Full Disk Access、Accessibility、Automation 或 Voice Memos 私有 entitlement。
+**核心判断：**正式分发是“Developer ID Application 签名 payload → Developer ID Installer signed flat PKG → notarize → staple”，并通过 GitHub immutable Release 与 own-tap cask 复用同一 PKG。裸 Mach-O ZIP 只能作为在线-ticket 辅助下载，不能承诺 offline-safe。签名、公证、Homebrew SHA-256 和 GitHub immutable release 各自解决不同问题；它们都不授予 Full Disk Access 或其它 TCC 用户授权。当前只读产品不依赖 Accessibility/Automation，也不获取 Voice Memos 私有 entitlement。
 
 ## 1. macOS 与 CPU 矩阵
 
@@ -136,7 +138,7 @@ spctl --assess --type install --verbose=4 \
 ```
 
 6. PKG 公证成功后直接 `stapler staple`/`validate` 外层 PKG；这是正式 offline-safe 主产物。Apple 支持对 DMG、signed flat PKG 和 executable bundle 装订；**裸 Mach-O ZIP 不能 staple**。ZIP 可单独 notarize，但仅依赖在线 ticket，离线安装不在 v0.1 保证范围。[Packaging Mac software for distribution](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)、[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
-7. 最终重建 `SHA256SUMS`，再用另一台 Mac 从 PKG 安装路径运行 `spctl`、`codesign --verify`、`lipo -archs` 和 smoke tests。公证不是 TCC grant，也不替代 FDA/Accessibility。
+7. 最终重建 `SHA256SUMS`，再用另一台 Mac 从 PKG 安装路径运行 `spctl`、`codesign --verify`、`lipo -archs` 和 smoke tests。公证不是 TCC grant，也不替代 FDA 或其它用户授权。
 
 可选 ZIP 只为脚本友好下载：对包含已签名 Mach-O 的 ZIP 运行 `notarytool submit ...zip --wait`，验证在线 ticket；**不要执行 `stapler staple`，不要作离线支持承诺**。
 
@@ -206,8 +208,8 @@ source formula 只在能够用 Swift tools 6.0+、deployment target 15.0 的固�
 
 ### 推论（不得当作 Apple 合同）
 
-1. Formula 从 `Cellar/name/version` 升级到新版本、ZIP 用户把 binary 移到 `~/.local/bin`、或 cask/PKG 升级/重装，均可能改变 TCC 看到的 executable/code identity 上下文。Apple 未公开承诺这些迁移保留 Voice Memos 所需 FDA/AX/Automation 授权。
-2. v0.1 让 doctor/action 记录实际 executable 的路径、`codesign -d -vv` 的 Identifier/TeamIdentifier、架构、版本和安装渠道；遇到权限失败应提示用户重新授权，而不是猜测 Terminal 授权可继承。
+1. Formula 从 `Cellar/name/version` 升级到新版本、ZIP 用户把 binary 移到 `~/.local/bin`、或 cask/PKG 升级/重装，均可能改变 TCC 看到的 executable/code identity 上下文。Apple 未公开承诺这些迁移保留 Voice Memos 只读访问所需的 FDA/用户授权。
+2. v0.1 让 doctor 记录实际 executable 的路径、`codesign -d -vv` 的 Identifier/TeamIdentifier、架构、版本和安装渠道；遇到权限失败应提示用户重新授权，而不是猜测 Terminal 授权可继承。
 3. 正式 PKG 固定安装路径（例如 `/usr/local/bin/voice-memos-cli`，需管理员确认）；ZIP 辅助下载建议用户固定到 `~/.local/bin/voice-memos-cli`，但仍需测试路径变化；Homebrew 用户必须知道 active symlink 不是稳定的 TCC 合同。
 
 建议验收命令（不会重置权限，也不读取录音）：
@@ -217,8 +219,8 @@ command -v voice-memos-cli
 realpath "$(command -v voice-memos-cli)"
 codesign -d -vv "$(realpath "$(command -v voice-memos-cli)")" 2>&1 | rg 'Identifier|TeamIdentifier|Authority|Format'
 spctl --assess --type execute --verbose=4 "$(realpath "$(command -v voice-memos-cli)")"
-tccutil reset Accessibility com.patrickfu.voice-memos-cli   # 仅隔离测试机使用
 tccutil reset SystemPolicyAllFiles com.patrickfu.voice-memos-cli
+# 当前只读产品不使用 Accessibility/Apple Events；如未来研究需要隔离测试，再单独评估。
 ```
 
 ## 7. CI 分层：无凭据与有凭据 release gates

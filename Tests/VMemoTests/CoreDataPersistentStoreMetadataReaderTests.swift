@@ -76,7 +76,7 @@ final class CoreDataPersistentStoreMetadataReaderTests: XCTestCase {
         defer { try? lease.cleanup() }
         let callerOwnedModel = fixture.model.mutableCopy() as! NSManagedObjectModel
         let reader = CoreDataPersistentStoreMetadataReader(model: callerOwnedModel)
-        callerOwnedModel.entities.append(EmptyCoreDataStoreFixture.entity(named: "CallerMutation"))
+        callerOwnedModel.entities.append(EmptyCoreDataStoreFixture.entity(named: "CallerAddedEntity"))
 
         let metadata = try reader.readMetadata(from: lease)
 

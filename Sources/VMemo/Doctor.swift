@@ -1,9 +1,8 @@
-import ApplicationServices
 import Foundation
 import Security
 
 protocol DoctorPort: Sendable {
-    func inspect(includeUI: Bool) throws -> DoctorReport
+    func inspect() throws -> DoctorReport
 }
 
 struct DoctorReport: Equatable, Sendable, Codable {
@@ -70,39 +69,26 @@ enum DoctorSigningMetadata: Sendable {
     case unavailable
 }
 
-protocol DoctorUITrustPort: Sendable {
-    /// Reads current Accessibility trust only. It must never ask macOS to prompt.
-    func isTrusted() -> Bool
-}
-
 struct SystemDoctorPort: DoctorPort {
     private let environment: any DoctorEnvironment
-    private let uiTrust: any DoctorUITrustPort
 
-    init(
-        environment: any DoctorEnvironment = SystemDoctorEnvironment(),
-        uiTrust: any DoctorUITrustPort = SystemDoctorUITrustPort()
-    ) {
+    init(environment: any DoctorEnvironment = SystemDoctorEnvironment()) {
         self.environment = environment
-        self.uiTrust = uiTrust
     }
 
-    func inspect(includeUI: Bool) throws -> DoctorReport {
+    func inspect() throws -> DoctorReport {
         let runtime = environment.runtime()
         let application = environment.voiceMemosApplication()
         let library = environment.library()
         let signing = environment.signing()
 
-        var checks = [
+        let checks = [
             runtimeCheck(runtime),
             applicationCheck(application),
             libraryCheck(library),
             schemaCheck(),
             signingCheck(signing),
         ]
-        if includeUI {
-            checks.append(uiCheck())
-        }
         return DoctorReport(status: reportStatus(for: checks), checks: checks)
     }
 
@@ -177,13 +163,6 @@ struct SystemDoctorPort: DoctorPort {
             code: "schema_not_inspected",
             details: ["No recording database was opened."]
         )
-    }
-
-    private func uiCheck() -> DoctorCheck {
-        if uiTrust.isTrusted() {
-            return DoctorCheck(id: "ui_accessibility", status: .ready, code: "ui_accessibility_trusted", details: ["Accessibility trust was read without prompting."])
-        }
-        return DoctorCheck(id: "ui_accessibility", status: .blocked, code: "ui_accessibility_untrusted", details: ["Accessibility trust is not granted."])
     }
 
     private func reportStatus(for checks: [DoctorCheck]) -> DoctorReportStatus {
@@ -272,11 +251,5 @@ struct SystemVoiceMemosApplicationMetadataResolver: DoctorApplicationMetadataRes
         value.replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\t", with: " ")
-    }
-}
-
-struct SystemDoctorUITrustPort: DoctorUITrustPort {
-    func isTrusted() -> Bool {
-        AXIsProcessTrusted()
     }
 }

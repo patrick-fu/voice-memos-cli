@@ -5,8 +5,7 @@ enum CommandRequest {
     case search(query: String)
     case show(id: RecordingID)
     case export(id: RecordingID, destination: String)
-    case mutation(request: MutationRequest, dryRun: Bool, token: String?, confirmed: Bool)
-    case doctor(includeUI: Bool = false)
+    case doctor
 }
 
 enum OutputFormat {
@@ -29,20 +28,17 @@ struct CommandResult {
 struct CommandRunner: Sendable {
     let read: any RecordingReadPort
     let asset: any RecordingAssetPort
-    let write: any RecordingWritePort
     let doctor: any DoctorPort
     let encoder: any CommandOutputEncoder
 
     init(
         read: any RecordingReadPort,
         asset: any RecordingAssetPort,
-        write: any RecordingWritePort,
         doctor: any DoctorPort = UnconfiguredDoctorPort(),
         encoder: any CommandOutputEncoder = JSONOutputEncoder()
     ) {
         self.read = read
         self.asset = asset
-        self.write = write
         self.doctor = doctor
         self.encoder = encoder
     }
@@ -62,11 +58,9 @@ struct CommandRunner: Sendable {
             case let .export(id, destination):
                 let receipt = try asset.export(id: id, destination: destination)
                 return success(receipt, human: "Exported \(receipt.id).\n", output: output)
-            case let .mutation(request, dryRun, token, confirmed):
-                return runMutation(request, dryRun: dryRun, token: token, confirmed: confirmed, output: output)
-            case let .doctor(includeUI):
+            case .doctor:
                 do {
-                    return diagnostic(try doctor.inspect(includeUI: includeUI), output: output)
+                    return diagnostic(try doctor.inspect(), output: output)
                 } catch {
                     return failure(
                         code: "doctor_probe_failed",
@@ -147,90 +141,6 @@ struct CommandRunner: Sendable {
         return CommandResult(exitCode: exitCode, stdout: "", stderr: stderr)
     }
 
-    private func runMutation(
-        _ request: MutationRequest,
-        dryRun: Bool,
-        token: String?,
-        confirmed: Bool,
-        output: OutputFormat
-    ) -> CommandResult {
-        if dryRun {
-            guard token == nil, !confirmed else {
-                return failure(
-                    code: "mutation_mode_conflict",
-                    message: "--dry-run cannot be combined with --token or --confirm.",
-                    exitCode: ProcessExit.safetyFailure.rawValue,
-                    output: output
-                )
-            }
-            do {
-                let plan = try write.dryRun(request)
-                return success(
-                    plan,
-                    human: "Planned \(plan.operation) for \(plan.id).\nConfirmation token: \(plan.confirmationToken)\n",
-                    output: output
-                )
-            } catch {
-                return adapterFailure(error, operation: request.operation.description, output: output)
-            }
-        }
-
-        guard let token, confirmed else {
-            return failure(
-                code: "mutation_authorization_required",
-                message: "Execution requires both --token and --confirm.",
-                exitCode: ProcessExit.safetyFailure.rawValue,
-                output: output
-            )
-        }
-        do {
-            let result = try write.execute(request, authorization: MutationAuthorization(token: token, confirmed: confirmed))
-            return success(result, human: "Completed \(result.operation) for \(result.id).\n", output: output)
-        } catch {
-            return adapterFailure(error, operation: request.operation.description, output: output)
-        }
-    }
-
-    private func adapterFailure(_ error: Error, operation: String, output: OutputFormat) -> CommandResult {
-        if let error = error as? VMemoError {
-            return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
-        }
-        if let error = error as? SchemaAdapterError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? ProductionRecordingAdapterError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? SnapshottingRecordingReadError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? RecordingAssetError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? MutationAuthorizationError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? ProductionMutationWriteError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if let error = error as? ProductionMutationResolverError {
-            return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
-        }
-        if error is VoiceMemosAccessibilityError {
-            return failure(
-                code: "mutation_preflight_failed",
-                message: "The mutation target could not be safely verified.",
-                exitCode: ProcessExit.safetyFailure.rawValue,
-                output: output
-            )
-        }
-        return failure(
-            code: "adapter_operation_failed",
-            message: "The \(operation) adapter failed.",
-            exitCode: ProcessExit.operationalFailure.rawValue,
-            output: output
-        )
-    }
 }
 
 private extension CommandRequest {
@@ -240,7 +150,6 @@ private extension CommandRequest {
         case .search: "search"
         case .show: "show"
         case .export: "export"
-        case let .mutation(request, _, _, _): request.operation.description
         case .doctor: "doctor"
         }
     }

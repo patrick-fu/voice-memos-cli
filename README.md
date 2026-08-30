@@ -1,20 +1,42 @@
 # Voice Memos CLI
 
-An agent-friendly macOS CLI project for safely searching, inspecting, exporting, renaming, and deleting Voice Memos.
+A safe, agent-friendly macOS CLI for read-only Voice Memos retrieval and export.
 
-> Status: production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. Rename and delete use the same exact DB gate plus native Accessibility pre/post verification. The build 1380 live tree is virtualized: recording items are `AXButton` elements and custom actions are opaque native tokens. Raw-token handling is implemented. Live probing disproved `AXSetValue` search isolation and `AXPress` recording selection. In a clean single-window state, AX frame verification plus a native `CGEvent` double-click selected the exact item; its fresh raw `编辑标题` action entered title editing and native cancel exited without changing the title. Production mutation remains fail closed while the project decides whether this verified input synthesis belongs in the public backend and validates the rename commit transition. Every unsupported condition fails closed.
+> Current scope: `list`, `search`, `show`, `export`, and `doctor`. `rename` and `delete` are not supported. This CLI does not require or use Accessibility, CGEvent, mutation tokens, confirmation/dry-run flows, or Shortcuts write backends.
 
-The v0.1 contract is being designed around stable JSON, explicit exit codes, stdout/stderr separation, dry-run and confirmation controls, and the current plus previous major macOS versions.
+## Status
+
+Production read and `.m4a` export are enabled only for the exact macOS 26 / Voice Memos build 1380 contract. All other builds and environments fail closed as unsupported.
+
+The v0.1 contract targets stable JSON, explicit exit codes, and stdout/stderr separation across the supported macOS majors.
+
+## Supported commands
+
+- `list`
+- `search`
+- `show`
+- `export`
+- `doctor`
 
 `list`, `search`, `show`, and `export` first create a temporary SQLite snapshot, then validate the exact bundle identity, Core Data persistent-store metadata, and 29-column `ZCLOUDRECORDING` schema. Only rows whose `ZEVICTIONDATE` is SQLite `NULL` are exposed. `VMEMO_RECORDINGS_ROOT` is a test-only root override; subprocess tests must always set it to an isolated fixture directory.
 
-`rename` and `delete` retain their two-call shape: `--dry-run` returns a 30-second token; a second identical invocation needs `--token` and `--confirm`. Tokens bind canonical request, fresh DB source, fresh AX verification, and environment fingerprints; only their hashes are stored. The authorization directory is created lazily only by a mutation attempt at `~/Library/Application Support/vmemo/mutation-authorizations` (tests may set `VMEMO_MUTATION_TOKEN_ROOT`). A process-wide session lock covers verification, consumption before UI action, and fresh DB/UI postconditions. No read, help, or doctor command creates or accesses it.
+`doctor` reports diagnostics without requesting or using Accessibility and without changing Voice Memos data.
 
-## Plan
+## Out of scope
+
+- `rename`
+- `delete`
+- Accessibility/CGEvent-driven UI automation
+- mutation authorization tokens or a mutation authorization directory
+- direct Voice Memos DB, asset, or CloudKit writes
+
+Research documents that discuss mutation, Accessibility, and CGEvent are retained as historical and decision evidence, not as the current implementation plan.
+
+## Plan and research
 
 The completed design roadmap is [Plan a safe, agent-friendly macOS Voice Memos CLI](https://github.com/patrick-fu/voice-memos-cli/issues/1). Its child issues hold each decision and the evidence behind it.
 
-Current research found no supported direct Voice Memos data API or transcript write-back interface. Direct private-store mutation is excluded; supported UI/Share paths and opt-in Shortcuts helpers are evaluated separately.
+Current research found no supported direct Voice Memos data API or transcript write-back interface. Direct private-store mutation is excluded.
 
 The release target is macOS 15.0+, distributed as a universal2 signed, notarized, and stapled PKG. The same PKG will be available through a project-owned Homebrew cask; source builds remain a secondary developer path.
 

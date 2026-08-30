@@ -1,5 +1,7 @@
 # Voice Memos rename/delete：input synthesis 之外的替代路线
 
+> **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。本文是研究/历史证据，记录既有调研与失败路径，不作为当前实现计划。
+
 研究日期：2026-08-30。目标：对公开分发的独立 macOS CLI，判断除「AXUIElement 语义校验 + CoreGraphics `CGEvent` 双击/键盘输入」外，是否还有可精确 rename/delete Voice Memos 的替代。
 
 本次检查只读系统 app、SDK headers、launchd plist、App Intents metadata 与官方文档；**未启动 Voice Memos，未读取/输出任何真实录音、标题、转写、数据库行或用户容器内容**。下文「已证实」只覆盖本机静态事实或已引用的 Apple 一手资料；live UI 事实仅复述仓库已验证、且不包含用户数据的探针结论。

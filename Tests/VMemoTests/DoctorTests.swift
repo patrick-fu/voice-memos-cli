@@ -5,11 +5,11 @@ import XCTest
 final class DoctorTests: XCTestCase {
     func testReadyReportUsesOrderedChecksAndVersionedJSONOnStandardOutput() throws {
         let port = FakeDoctorPort(report: report(status: .ready))
-        let result = makeRunner(doctor: port).run(.doctor(includeUI: false), output: .json)
+        let result = makeRunner(doctor: port).run(.doctor, output: .json)
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(result.stderr, "")
-        XCTAssertEqual(port.requests, [false])
+        XCTAssertEqual(port.requests, 1)
         let envelope = try decodeJSON(result.stdout)
         XCTAssertEqual(envelope["version"] as? Int, 1)
         XCTAssertEqual(envelope["status"] as? String, "ok")
@@ -19,7 +19,7 @@ final class DoctorTests: XCTestCase {
     }
 
     func testBlockedReportPreservesDataAndUsesSafetyExit() throws {
-        let result = makeRunner(doctor: FakeDoctorPort(report: report(status: .blocked))).run(.doctor(includeUI: false), output: .json)
+        let result = makeRunner(doctor: FakeDoctorPort(report: report(status: .blocked))).run(.doctor, output: .json)
 
         XCTAssertEqual(result.exitCode, ProcessExit.safetyFailure.rawValue)
         XCTAssertEqual(result.stderr, "")
@@ -27,7 +27,7 @@ final class DoctorTests: XCTestCase {
     }
 
     func testIncompleteReportUsesDeterministicHumanOutputAndPartialExit() {
-        let result = makeRunner(doctor: FakeDoctorPort(report: report(status: .incomplete))).run(.doctor(includeUI: false), output: .human)
+        let result = makeRunner(doctor: FakeDoctorPort(report: report(status: .incomplete))).run(.doctor, output: .human)
 
         XCTAssertEqual(result.exitCode, ProcessExit.partialFailure.rawValue)
         XCTAssertEqual(result.stderr, "")
@@ -43,46 +43,29 @@ final class DoctorTests: XCTestCase {
     }
 
     func testProbeFailureUsesOperationalFailureEnvelope() throws {
-        let result = makeRunner(doctor: ThrowingDoctorPort()).run(.doctor(includeUI: false), output: .json)
+        let result = makeRunner(doctor: ThrowingDoctorPort()).run(.doctor, output: .json)
 
         XCTAssertEqual(result.exitCode, ProcessExit.operationalFailure.rawValue)
         XCTAssertEqual(result.stdout, "")
         XCTAssertEqual((try decodeJSON(result.stderr)["error"] as? [String: Any])?["code"] as? String, "doctor_probe_failed")
     }
 
-    func testSystemDoctorSkipsUIProbeUnlessExplicitlyRequested() throws {
-        let uiProbe = UIProbeSpy()
-        let port = SystemDoctorPort(environment: ReadyDoctorEnvironment(), uiTrust: uiProbe)
-
-        let withoutUI = try port.inspect(includeUI: false)
-        XCTAssertEqual(uiProbe.callCount, 0)
-        XCTAssertFalse(withoutUI.checks.contains { $0.id == "ui_accessibility" })
-
-        let withUI = try port.inspect(includeUI: true)
-        XCTAssertEqual(uiProbe.callCount, 1)
-        XCTAssertEqual(withUI.checks.last?.id, "ui_accessibility")
-        XCTAssertEqual(withUI.checks.last?.status, .ready)
-    }
-
     func testSystemDoctorOnlySupportsKnownOSAndArchitectures() throws {
         let supported = try SystemDoctorPort(
-            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 26, architecture: "x86_64")),
-            uiTrust: UIProbeSpy()
-        ).inspect(includeUI: false)
+            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 26, architecture: "x86_64"))
+        ).inspect()
         XCTAssertEqual(check(named: "runtime", in: supported).status, .ready)
         XCTAssertEqual(check(named: "runtime", in: supported).code, "runtime_supported")
 
         let futureOS = try SystemDoctorPort(
-            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 27, architecture: "arm64")),
-            uiTrust: UIProbeSpy()
-        ).inspect(includeUI: false)
+            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 27, architecture: "arm64"))
+        ).inspect()
         XCTAssertEqual(check(named: "runtime", in: futureOS).status, .blocked)
         XCTAssertEqual(check(named: "runtime", in: futureOS).code, "unsupported_os")
 
         let unknownArchitecture = try SystemDoctorPort(
-            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 15, architecture: "unknown")),
-            uiTrust: UIProbeSpy()
-        ).inspect(includeUI: false)
+            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 15, architecture: "unknown"))
+        ).inspect()
         XCTAssertEqual(check(named: "runtime", in: unknownArchitecture).status, .blocked)
         XCTAssertEqual(check(named: "runtime", in: unknownArchitecture).code, "unsupported_architecture")
     }
@@ -105,11 +88,10 @@ final class DoctorTests: XCTestCase {
         let runner = CommandRunner(
             read: RecordingReadSpy(calls: calls),
             asset: RecordingAssetSpy(calls: calls),
-            write: RecordingWriteSpy(calls: calls),
             doctor: FakeDoctorPort(report: report(status: .ready))
         )
 
-        let result = runner.run(.doctor(includeUI: false), output: .json)
+        let result = runner.run(.doctor, output: .json)
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(calls.values, [])
@@ -119,7 +101,6 @@ final class DoctorTests: XCTestCase {
         CommandRunner(
             read: UnconfiguredReadPort(),
             asset: UnconfiguredAssetPort(),
-            write: UnconfiguredWritePort(),
             doctor: doctor
         )
     }
@@ -173,20 +154,20 @@ final class DoctorTests: XCTestCase {
 
 private final class FakeDoctorPort: DoctorPort, @unchecked Sendable {
     let report: DoctorReport
-    private(set) var requests: [Bool] = []
+    private(set) var requests = 0
 
     init(report: DoctorReport) {
         self.report = report
     }
 
-    func inspect(includeUI: Bool) throws -> DoctorReport {
-        requests.append(includeUI)
+    func inspect() throws -> DoctorReport {
+        requests += 1
         return report
     }
 }
 
 private struct ThrowingDoctorPort: DoctorPort {
-    func inspect(includeUI: Bool) throws -> DoctorReport {
+    func inspect() throws -> DoctorReport {
         throw FixtureDoctorError.failed
     }
 }
@@ -215,15 +196,6 @@ private struct DoctorEnvironmentFixture: DoctorEnvironment {
     func signing() -> DoctorSigningMetadata { .available }
 }
 
-private final class UIProbeSpy: DoctorUITrustPort, @unchecked Sendable {
-    private(set) var callCount = 0
-
-    func isTrusted() -> Bool {
-        callCount += 1
-        return true
-    }
-}
-
 private final class RecordingPortCallSpy: @unchecked Sendable {
     private(set) var values: [String] = []
 
@@ -246,19 +218,5 @@ private struct RecordingAssetSpy: RecordingAssetPort {
     func export(id: RecordingID, destination: String) throws -> ExportReceipt {
         calls.append("export")
         return ExportReceipt(id: id, destination: destination)
-    }
-}
-
-private struct RecordingWriteSpy: RecordingWritePort {
-    let calls: RecordingPortCallSpy
-
-    func dryRun(_ request: MutationRequest) throws -> MutationPlan {
-        calls.append("dryRun")
-        return MutationPlan(request: request, confirmationToken: "unused")
-    }
-
-    func execute(_ request: MutationRequest, authorization: MutationAuthorization) throws -> MutationResult {
-        calls.append("execute")
-        return MutationResult(request: request)
     }
 }

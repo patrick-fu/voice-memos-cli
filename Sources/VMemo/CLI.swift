@@ -4,21 +4,20 @@ import Foundation
 struct VMemo: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "vmemo",
-        abstract: "Safely inspect and manage Voice Memos recordings.",
+        abstract: "Inspect Voice Memos recordings.",
         usage: "vmemo <subcommand>",
         discussion: """
         Agent-facing CLI with a stable, fail-closed contract.
 
         Output: human reports go to stdout; diagnostics go to stderr. Add --json for the version 1 JSON envelope (version: 1, status, and data or error).
         Exit codes: 0 success, 2 usage error, 3 operational/output error, 4 safety or adapter block, 5 partial/incomplete result.
-        Recording IDs are opaque and must be passed exactly as returned. Mutations fail closed when safety or adapter checks cannot be satisfied.
-        delete moves a recording to Recently Deleted; it does not permanently erase it.
+        Recording IDs are opaque and must be passed exactly as returned.
 
         Examples:
           vmemo list --json
           vmemo show --id opaque-recording-id --json
         """,
-        subcommands: [List.self, Search.self, Show.self, Export.self, Rename.self, Delete.self, Doctor.self]
+        subcommands: [List.self, Search.self, Show.self, Export.self, Doctor.self]
     )
 }
 
@@ -103,57 +102,15 @@ private struct Export: RoutedCommand {
     func request() -> CommandRequest { .export(id: RecordingID(value: id), destination: outputPath) }
 }
 
-private struct Rename: RoutedCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Rename one recording.",
-        usage: "vmemo rename --id <opaque-recording-id> --title <new-title> (--dry-run | --token <token> --confirm) [--json]",
-        discussion: "Two calls are required: first run --dry-run to receive a short-lived token, then rerun with the same payload and --token TOKEN --confirm. Any payload change invalidates the token. Example: vmemo rename --id opaque-recording-id --title \"New title\" --dry-run --json"
-    )
-    @Option(name: .long, help: "Opaque recording identifier (required).") var id: String
-    @Option(name: .long, help: "New user-visible title (required).") var title: String
-    @OptionGroup var mutation: MutationOptions
-    @OptionGroup var output: OutputOptions
-
-    func request() -> CommandRequest {
-        .mutation(
-            request: MutationRequest(id: RecordingID(value: id), operation: .rename(title: title)),
-            dryRun: mutation.dryRun,
-            token: mutation.token,
-            confirmed: mutation.confirm
-        )
-    }
-}
-
-private struct Delete: RoutedCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Move one recording to Recently Deleted.",
-        usage: "vmemo delete --id <opaque-recording-id> (--dry-run | --token <token> --confirm) [--json]",
-        discussion: "delete moves the recording to Recently Deleted. Two calls are required: first run --dry-run to receive a short-lived token, then rerun with the same payload and --token TOKEN --confirm. Any payload change invalidates the token. Example: vmemo delete --id opaque-recording-id --dry-run --json"
-    )
-    @Option(name: .long, help: "Opaque recording identifier (required).") var id: String
-    @OptionGroup var mutation: MutationOptions
-    @OptionGroup var output: OutputOptions
-
-    func request() -> CommandRequest {
-        .mutation(
-            request: MutationRequest(id: RecordingID(value: id), operation: .moveToRecentlyDeleted),
-            dryRun: mutation.dryRun,
-            token: mutation.token,
-            confirmed: mutation.confirm
-        )
-    }
-}
-
 private struct Doctor: RoutedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Check adapter availability and compatibility.",
-        usage: "vmemo doctor [--ui] [--json]",
-        discussion: "Ordinary mode does not check Accessibility. Add --ui to read current Accessibility trust; it is read-only and never prompts. Example: vmemo doctor --ui --json"
+        usage: "vmemo doctor [--json]",
+        discussion: "Check runtime, application, library, schema, and signing readiness. Example: vmemo doctor --json"
     )
-    @Flag(name: .long, help: "Read Accessibility trust without prompting (read-only).") var ui = false
     @OptionGroup var output: OutputOptions
 
-    func request() -> CommandRequest { .doctor(includeUI: ui) }
+    func request() -> CommandRequest { .doctor }
 }
 
 private struct OutputOptions: ParsableArguments {
@@ -163,17 +120,6 @@ private struct OutputOptions: ParsableArguments {
     var format: OutputFormat {
         json ? .json : .human
     }
-}
-
-private struct MutationOptions: ParsableArguments {
-    @Flag(name: .long, help: "Return a mutation plan without executing it.")
-    var dryRun = false
-
-    @Option(name: .long, help: "Short-lived confirmation token.")
-    var token: String?
-
-    @Flag(name: .long, help: "Explicitly authorize execution with --token.")
-    var confirm = false
 }
 
 private enum ProductionComposition {
