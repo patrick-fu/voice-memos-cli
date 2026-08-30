@@ -81,7 +81,7 @@ final class VMemoCLITests: XCTestCase {
         XCTAssertEqual(envelope["status"] as? String, "error")
         let expectedCode = ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26
             ? "snapshot_creation_failed"
-            : "unsupported_schema"
+            : "unsupported_os"
         XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, expectedCode)
     }
 
