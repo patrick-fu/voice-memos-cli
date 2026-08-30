@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="vmemo — a safe, read-only macOS Voice Memos CLI for agents / 面向 agent 的安全只读命令行工具。">
+    <meta name="theme-color" content="#09140f">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="vmemo · Voice Memos for agents">
+    <meta property="og:description" content="A safe, read-only macOS Voice Memos CLI for agents / 面向 agent 的安全只读命令行工具。">
+    <meta property="og:url" content="https://patrick-fu.github.io/voice-memos-cli/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="vmemo · Voice Memos for agents">
+    <meta name="twitter:description" content="A safe, read-only macOS Voice Memos CLI for agents / 面向 agent 的安全只读命令行工具。">
+    <title>vmemo · Voice Memos for agents</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#content" data-zh="跳到主要内容" data-en="Skip to content">跳到主要内容</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="vmemo 主页" data-aria-zh="vmemo 主页" data-aria-en="vmemo home"><span class="brand-mark" aria-hidden="true">⌁</span>vmemo</a>
+      <nav aria-label="主导航" data-aria-zh="主导航" data-aria-en="Primary navigation">
+        <a href="#workflow" data-zh="工作流" data-en="Workflow">工作流</a>
+        <a href="#safety" data-zh="安全边界" data-en="Safety">安全边界</a>
+        <a href="#install" data-zh="安装" data-en="Install">安装</a>
+      </nav>
+      <button class="language" type="button" aria-label="切换至英文" data-aria-zh="切换至英文" data-aria-en="Switch to Chinese" aria-pressed="false">EN</button>
+    </header>
+
+    <main id="content">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="pulse" aria-hidden="true"></span><span data-zh="面向 macOS 的只读工具" data-en="A read-only tool for macOS">面向 macOS 的只读工具</span></p>
+          <h1 data-zh="让 agent 安全地读取你的语音备忘录。" data-en="Let agents read Voice Memos—safely.">让 agent 安全地读取你的语音备忘录。</h1>
+          <p class="lede" data-zh="vmemo 是稳定、可脚本化的 CLI：列出、搜索、查看和导出 Voice Memos；不改名、不删除，也不触碰私有数据写入。" data-en="vmemo is a stable, scriptable CLI to list, search, inspect, and export Voice Memos—without renaming, deleting, or writing to private data.">vmemo 是稳定、可脚本化的 CLI：列出、搜索、查看和导出 Voice Memos；不改名、不删除，也不触碰私有数据写入。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/patrick-fu/voice-memos-cli/releases"><span data-zh="查看 Releases" data-en="View Releases">查看 Releases</span><span aria-hidden="true">↗</span></a>
+            <a class="button button-quiet" href="https://github.com/patrick-fu/voice-memos-cli"><span data-zh="查看 GitHub" data-en="View GitHub">查看 GitHub</span><span aria-hidden="true">↗</span></a>
+          </div>
+          <p class="status"><span class="status-dot" aria-hidden="true"></span><span data-zh="v0.1.0 · 当前仅支持 macOS 26 + Voice Memos build 1380" data-en="v0.1.0 · currently macOS 26 + Voice Memos build 1380 only">v0.1.0 · 当前仅支持 macOS 26 + Voice Memos build 1380</span></p>
+        </div>
+
+        <div class="terminal-card" aria-label="vmemo 命令行示例" data-aria-zh="vmemo 命令行示例" data-aria-en="vmemo command line example">
+          <div class="terminal-top"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>terminal · zsh</span></div>
+          <pre><code><span class="prompt">$</span> vmemo doctor --json
+<span class="muted">{</span>
+  <span class="key">"version"</span>: <span class="number">1</span>,
+  <span class="key">"status"</span>: <span class="string">"ok"</span>,
+  <span class="key">"data"</span>: { <span class="key">"status"</span>: <span class="string">"ready"</span>, … }
+<span class="muted">}</span>
+
+<span class="prompt">$</span> vmemo search --query <span class="string">"research"</span> --json
+<span class="muted">{</span><span class="key">"version"</span>:<span class="number">1</span>,<span class="key">"status"</span>:<span class="string">"ok"</span>,<span class="key">"data"</span>:{<span class="key">"recordings"</span>:[…]}<span class="muted">}</span></code></pre>
+          <div class="terminal-foot"><span data-zh="机器可读的输出" data-en="machine-readable output">机器可读的输出</span><span>JSON v1</span></div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="产品原则" data-aria-zh="产品原则" data-aria-en="Product principles">
+        <div><strong>01</strong><span data-zh="只读设计" data-en="Read-only by design">只读设计</span></div>
+        <div><strong>02</strong><span data-zh="JSON 合同" data-en="JSON contract">JSON 合同</span></div>
+        <div><strong>03</strong><span data-zh="失败即关闭" data-en="Fail closed">失败即关闭</span></div>
+        <div><strong>04</strong><span data-zh="本地优先" data-en="Local first">本地优先</span></div>
+      </section>
+
+      <section class="section workflow" id="workflow">
+        <div class="section-intro">
+          <p class="eyebrow" data-zh="为 agent 而生" data-en="Built for agents">为 agent 而生</p>
+          <h2 data-zh="不是一段脆弱的 UI 自动化。" data-en="Not a brittle layer of UI automation.">不是一段脆弱的 UI 自动化。</h2>
+          <p data-zh="每个命令都有明确的 stdout/stderr 边界、稳定 exit code 与 JSON v1 envelope，让你的自动化可以做正确的下一步。" data-en="Every command has deliberate stdout/stderr boundaries, stable exit codes, and a JSON v1 envelope so automation can take the right next step.">每个命令都有明确的 stdout/stderr 边界、稳定 exit code 与 JSON v1 envelope，让你的自动化可以做正确的下一步。</p>
+        </div>
+        <ol class="flow-list">
+          <li><span class="flow-index">01</span><div><code>doctor</code><p data-zh="先验证系统、App、library 与 schema；未就绪时停止。" data-en="Validate the system, app, library, and schema; stop when not ready.">先验证系统、App、library 与 schema；未就绪时停止。</p></div></li>
+          <li><span class="flow-index">02</span><div><code>list</code> / <code>search</code><p data-zh="获取 opaque ID；搜索只匹配录音标题。" data-en="Obtain opaque IDs; search matches recording titles only.">获取 opaque ID；搜索只匹配录音标题。</p></div></li>
+          <li><span class="flow-index">03</span><div><code>show</code> / <code>export</code><p data-zh="确认目标或导出 .m4a 副本，源录音保持原样。" data-en="Inspect a target or export an .m4a copy; source recordings remain untouched.">确认目标或导出 .m4a 副本，源录音保持原样。</p></div></li>
+        </ol>
+      </section>
+
+      <section class="section capabilities" aria-labelledby="capabilities-heading">
+        <div class="section-intro">
+          <p class="eyebrow" data-zh="小而完整的工具面" data-en="A deliberately small surface">小而完整的工具面</p>
+          <h2 id="capabilities-heading" data-zh="五个命令，清晰的承诺。" data-en="Five commands. Clear promises.">五个命令，清晰的承诺。</h2>
+        </div>
+        <div class="command-grid">
+          <article><code>list</code><p data-zh="列出 active recordings。" data-en="List active recordings.">列出 active recordings。</p></article>
+          <article><code>search</code><p data-zh="按标题进行大小写不敏感搜索。" data-en="Search titles, case-insensitively.">按标题进行大小写不敏感搜索。</p></article>
+          <article><code>show</code><p data-zh="通过 opaque ID 确认一条录音。" data-en="Inspect one recording by opaque ID.">通过 opaque ID 确认一条录音。</p></article>
+          <article><code>export</code><p data-zh="复制到不存在的目标路径，仅支持 .m4a。" data-en="Copy to a new destination; .m4a only.">复制到不存在的目标路径，仅支持 .m4a。</p></article>
+          <article class="featured"><code>doctor</code><p data-zh="在读数据前做只读、隔离的准入检查。" data-en="Run isolated, read-only admission checks before data access.">在读数据前做只读、隔离的准入检查。</p></article>
+        </div>
+      </section>
+
+      <section class="section safety" id="safety">
+        <div class="safety-card">
+          <div>
+            <p class="eyebrow" data-zh="安全是产品边界" data-en="Safety is the product boundary">安全是产品边界</p>
+            <h2 data-zh="能读取，不等于能改写。" data-en="Read access is not write access.">能读取，不等于能改写。</h2>
+            <p data-zh="vmemo 对不匹配的环境和 schema 直接拒绝；读取时使用临时 SQLite snapshot。它不需要 Accessibility，不发送 Apple Events，也不使用任何 mutation token。" data-en="vmemo rejects mismatched environments and schemas, and reads through a temporary SQLite snapshot. It needs no Accessibility access, sends no Apple Events, and uses no mutation tokens.">vmemo 对不匹配的环境和 schema 直接拒绝；读取时使用临时 SQLite snapshot。它不需要 Accessibility，不发送 Apple Events，也不使用任何 mutation token。</p>
+          </div>
+          <ul class="boundary-list">
+            <li><span aria-hidden="true">✓</span><span data-zh="不支持 rename 或 delete" data-en="No rename or delete commands">不支持 rename 或 delete</span></li>
+            <li><span aria-hidden="true">✓</span><span data-zh="不直接写入 Voice Memos 数据库、asset 或 CloudKit" data-en="No direct writes to the Voice Memos database, assets, or CloudKit">不直接写入 Voice Memos 数据库、asset 或 CloudKit</span></li>
+            <li><span aria-hidden="true">✓</span><span data-zh="未通过精确契约时 fail closed" data-en="Fails closed outside its exact contract">未通过精确契约时 fail closed</span></li>
+            <li><span aria-hidden="true">✓</span><span data-zh="录音标题仅出现在调用方请求的 stdout" data-en="Recording titles appear only in caller-requested stdout">录音标题仅出现在调用方请求的 stdout</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section install" id="install">
+        <div class="section-intro">
+          <p class="eyebrow" data-zh="开始使用" data-en="Get started">开始使用</p>
+          <h2 data-zh="v0.1.0 发布后提供签名 PKG。" data-en="Signed v0.1.0 PKG, once published.">v0.1.0 发布后提供签名 PKG。</h2>
+          <p data-zh="v0.1.0 发布后，正式发行包将完成 Developer ID 签名与 Apple 公证，并安装到 /usr/local/bin/vmemo。源码构建保留给开发与审阅。" data-en="Once v0.1.0 is published, its production package will be Developer ID signed and Apple-notarized, installing vmemo at /usr/local/bin/vmemo. Source builds remain available for development and review.">v0.1.0 发布后，正式发行包将完成 Developer ID 签名与 Apple 公证，并安装到 /usr/local/bin/vmemo。源码构建保留给开发与审阅。</p>
+        </div>
+        <div class="install-grid">
+          <aside class="release-card"><p class="release-kicker" data-zh="推荐路径" data-en="Recommended path">推荐路径</p><h3 data-zh="signed &amp; notarized PKG" data-en="Signed &amp; notarized PKG">signed &amp; notarized PKG</h3><p data-zh="发布后的 v0.1.0 将安装至 /usr/local/bin/vmemo。下载后按 macOS Installer 引导完成安装。" data-en="The published v0.1.0 package will install to /usr/local/bin/vmemo. Download it, then follow the macOS Installer prompts.">发布后的 v0.1.0 将安装至 /usr/local/bin/vmemo。下载后按 macOS Installer 引导完成安装。</p><a class="button button-primary" href="https://github.com/patrick-fu/voice-memos-cli/releases"><span data-zh="查看 Releases" data-en="View Releases">查看 Releases</span><span aria-hidden="true">↗</span></a></aside>
+          <div class="code-card"><div class="code-label" data-zh="次要路径 · 源码构建" data-en="Secondary path · source build">次要路径 · 源码构建</div><pre><code>git clone https://github.com/patrick-fu/voice-memos-cli.git
+cd voice-memos-cli
+swift build -c release
+.build/release/vmemo doctor
+.build/release/vmemo list --json</code></pre></div>
+        </div>
+        <aside class="requirements"><h3 data-zh="兼容性与访问" data-en="Compatibility &amp; access">兼容性与访问</h3><p data-zh="生产数据路径只支持 macOS 26 与 Voice Memos build 1380。其他系统与 build 会安全地返回 unsupported。" data-en="The production data path supports macOS 26 and Voice Memos build 1380 only. Other systems and builds safely return unsupported.">生产数据路径只支持 macOS 26 与 Voice Memos build 1380。其他系统与 build 会安全地返回 unsupported。</p><p data-zh="你可能需要在「系统设置 > 隐私与安全性」中授予 Full Disk Access；仅用户可以授予该权限。" data-en="You may need to grant Full Disk Access in System Settings › Privacy &amp; Security; only you can grant it.">你可能需要在「系统设置 > 隐私与安全性」中授予 Full Disk Access；仅用户可以授予该权限。</p></aside>
+      </section>
+
+      <section class="section privacy" aria-labelledby="privacy-heading">
+        <p class="eyebrow" data-zh="隐私说明" data-en="Privacy note">隐私说明</p>
+        <h2 id="privacy-heading" data-zh="你的录音不会经过本网站。" data-en="Your recordings never pass through this site.">你的录音不会经过本网站。</h2>
+        <p data-zh="这是纯静态文档站：没有分析脚本、追踪像素、外部字体或 CDN。vmemo 在本地运行；请让调用它的 agent 避免将录音标题、搜索词或含标题的路径写入日志。" data-en="This is a static documentation site: no analytics, tracking pixels, external fonts, or CDNs. vmemo runs locally; agents calling it should avoid logging recording titles, search queries, or title-bearing paths.">这是纯静态文档站：没有分析脚本、追踪像素、外部字体或 CDN。vmemo 在本地运行；请让调用它的 agent 避免将录音标题、搜索词或含标题的路径写入日志。</p>
+        <a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli/blob/main/docs/agent-contract.md" data-zh="阅读完整 Agent Contract →" data-en="Read the full Agent Contract →">阅读完整 Agent Contract →</a>
+      </section>
+    </main>
+
+    <footer><span>vmemo</span><span data-zh="安全的只读 Voice Memos CLI" data-en="A safe, read-only Voice Memos CLI">安全的只读 Voice Memos CLI</span><a href="https://github.com/patrick-fu/voice-memos-cli">GitHub ↗</a></footer>
+    <script src="script.js"></script>
+  </body>
+</html>

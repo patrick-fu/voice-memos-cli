@@ -73,13 +73,13 @@ xcrun swift build --help | rg -- '--arch|--scratch-path'
 export MACOSX_DEPLOYMENT_TARGET=15.0
 xcrun swift build -c release --arch arm64   --scratch-path .build/arm64
 xcrun swift build -c release --arch x86_64  --scratch-path .build/x86_64
-mkdir -p dist/voice-memos-cli-0.1.0
+mkdir -p dist/vmemo-0.1.0
 lipo -create \
-  .build/arm64/release/voice-memos-cli \
-  .build/x86_64/release/voice-memos-cli \
-  -output dist/voice-memos-cli-0.1.0/voice-memos-cli
-lipo -archs dist/voice-memos-cli-0.1.0/voice-memos-cli
-file dist/voice-memos-cli-0.1.0/voice-memos-cli
+  .build/arm64/release/vmemo \
+  .build/x86_64/release/vmemo \
+  -output dist/vmemo-0.1.0/vmemo
+lipo -archs dist/vmemo-0.1.0/vmemo
+file dist/vmemo-0.1.0/vmemo
 ```
 
 若当前 SwiftPM 不接受 `--arch`，使用 Xcode 生成的 package scheme，显式设置 `ARCHS="arm64 x86_64"`、`ONLY_ACTIVE_ARCH=NO`、`MACOSX_DEPLOYMENT_TARGET=15.0`，并以 `lipo -archs` 验收；不要把未经验证的 `--triple` 行为当作跨架构合同。Apple 的通用构建文档要求最终检查实际 Mach-O，而不是中间目录。[Building a universal macOS binary](https://developer.apple.com/documentation/Apple-Silicon/building-a-universal-macos-binary)
@@ -95,46 +95,46 @@ Apple 的公证要求适用于 command-line targets：所有 executable 有有�
 ### 纯 CLI/PKG 的准确顺序（正式主路径）
 
 1. 在干净 checkout、未签名产物目录中构建 arm64 与 x86_64，`lipo` 合并。
-2. 对最终 universal Mach-O 签名；非 bundle 的 identifier 固定为项目值（示例 `com.patrickfu.voice-memos-cli`），签名身份使用证书 SHA-1 或完整 Developer ID Application 名称。不要 `sudo codesign`；Apple 明确指出它会改变钥匙串/用户上下文。[Creating distribution-signed code](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)
+2. 对最终 universal Mach-O 签名；非 bundle 的 identifier 固定为 `com.paaatrick.voice-memos-cli`，签名身份使用证书 SHA-1 或完整 Developer ID Application 名称。不要 `sudo codesign`；Apple 明确指出它会改变钥匙串/用户上下文。[Creating distribution-signed code](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)
 3. 验证签名、runtime、timestamp 和两个 slice：
 
 ```zsh
 codesign --force --sign "Developer ID Application: <TEAM_NAME> (<TEAM_ID>)" \
   --timestamp --options runtime \
-  --identifier com.patrickfu.voice-memos-cli \
-  dist/voice-memos-cli-0.1.0/voice-memos-cli
-codesign --verify --verbose=4 --strict dist/voice-memos-cli-0.1.0/voice-memos-cli
-codesign -d -vv --arch arm64 dist/voice-memos-cli-0.1.0/voice-memos-cli
-codesign -d -vv --arch x86_64 dist/voice-memos-cli-0.1.0/voice-memos-cli
-spctl --assess --type execute --verbose=4 dist/voice-memos-cli-0.1.0/voice-memos-cli
+  --identifier com.paaatrick.voice-memos-cli \
+  dist/vmemo-0.1.0/vmemo
+codesign --verify --verbose=4 --strict dist/vmemo-0.1.0/vmemo
+codesign -d -vv --arch arm64 dist/vmemo-0.1.0/vmemo
+codesign -d -vv --arch x86_64 dist/vmemo-0.1.0/vmemo
+spctl --assess --type execute --verbose=4 dist/vmemo-0.1.0/vmemo
 ```
 
 4. 把已签名 Mach-O 放入 payload，构建并签 flat PKG。payload 仍是 Developer ID Application 签名；PKG 外层使用 Developer ID Installer 签名：
 
 ```zsh
 pkgbuild --root payload \
-  --identifier com.patrickfu.voice-memos-cli \
+  --identifier com.paaatrick.voice-memos-cli \
   --version 0.1.0 \
   --install-location /usr/local/bin \
-  dist/voice-memos-cli-0.1.0-unsigned.pkg
+  dist/vmemo-0.1.0-unsigned.pkg
 productsign --sign "Developer ID Installer: <TEAM_NAME> (<TEAM_ID>)" \
-  dist/voice-memos-cli-0.1.0-unsigned.pkg \
-  dist/voice-memos-cli-0.1.0-macos-universal2.pkg
-pkgutil --check-signature dist/voice-memos-cli-0.1.0-macos-universal2.pkg
+  dist/vmemo-0.1.0-unsigned.pkg \
+  dist/vmemo-0.1.0-macos-universal2.pkg
+pkgutil --check-signature dist/vmemo-0.1.0-macos-universal2.pkg
 ```
 
 5. 以 Xcode 14+ 的 `notarytool` 提交最终 PKG；`altool` 自 2023-11-01 起不再受理。凭据只能来自 CI secret/keychain profile，不能写进仓库或命令日志。[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
 
 ```zsh
 ditto -c -k --keepParent \
-  dist/voice-memos-cli-0.1.0 \
-  dist/voice-memos-cli-0.1.0-macos-universal2.zip
-xcrun notarytool submit dist/voice-memos-cli-0.1.0-macos-universal2.pkg \
+  dist/vmemo-0.1.0 \
+  dist/vmemo-0.1.0-macos-universal2.zip
+xcrun notarytool submit dist/vmemo-0.1.0-macos-universal2.pkg \
   --keychain-profile "notarytool-profile" --wait
-xcrun stapler staple dist/voice-memos-cli-0.1.0-macos-universal2.pkg
-xcrun stapler validate dist/voice-memos-cli-0.1.0-macos-universal2.pkg
+xcrun stapler staple dist/vmemo-0.1.0-macos-universal2.pkg
+xcrun stapler validate dist/vmemo-0.1.0-macos-universal2.pkg
 spctl --assess --type install --verbose=4 \
-  dist/voice-memos-cli-0.1.0-macos-universal2.pkg
+  dist/vmemo-0.1.0-macos-universal2.pkg
 ```
 
 6. PKG 公证成功后直接 `stapler staple`/`validate` 外层 PKG；这是正式 offline-safe 主产物。Apple 支持对 DMG、signed flat PKG 和 executable bundle 装订；**裸 Mach-O ZIP 不能 staple**。ZIP 可单独 notarize，但仅依赖在线 ticket，离线安装不在 v0.1 保证范围。[Packaging Mac software for distribution](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)、[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
@@ -151,8 +151,8 @@ GitHub Release 以 Git tag 为基础，可附 release notes 与资产；单资�
 推荐资产集合（PKG 为正式主产物，ZIP 为在线-ticket 辅助）：
 
 ```text
-voice-memos-cli-0.1.0-macos-universal2.pkg
-voice-memos-cli-0.1.0-macos-universal2.zip   # optional; offline unsupported
+vmemo-0.1.0-macos-universal2.pkg
+vmemo-0.1.0-macos-universal2.zip   # optional; offline unsupported
 SHA256SUMS
 ```
 
@@ -160,7 +160,7 @@ tag 使用不可移动的 `v0.1.0`。**发布前必须在仓库设置启用 immu
 
 ```zsh
 gh release verify v0.1.0
-gh release verify-asset v0.1.0 voice-memos-cli-0.1.0-macos-universal2.pkg
+gh release verify-asset v0.1.0 vmemo-0.1.0-macos-universal2.pkg
 shasum -a 256 -c SHA256SUMS
 ```
 
@@ -210,17 +210,16 @@ source formula 只在能够用 Swift tools 6.0+、deployment target 15.0 的固�
 
 1. Formula 从 `Cellar/name/version` 升级到新版本、ZIP 用户把 binary 移到 `~/.local/bin`、或 cask/PKG 升级/重装，均可能改变 TCC 看到的 executable/code identity 上下文。Apple 未公开承诺这些迁移保留 Voice Memos 只读访问所需的 FDA/用户授权。
 2. v0.1 让 doctor 记录实际 executable 的路径、`codesign -d -vv` 的 Identifier/TeamIdentifier、架构、版本和安装渠道；遇到权限失败应提示用户重新授权，而不是猜测 Terminal 授权可继承。
-3. 正式 PKG 固定安装路径（例如 `/usr/local/bin/voice-memos-cli`，需管理员确认）；ZIP 辅助下载建议用户固定到 `~/.local/bin/voice-memos-cli`，但仍需测试路径变化；Homebrew 用户必须知道 active symlink 不是稳定的 TCC 合同。
+3. 正式 PKG 固定安装路径 `/usr/local/bin/vmemo`；ZIP 辅助下载建议用户固定到 `~/.local/bin/vmemo`，但仍需测试路径变化；Homebrew 用户必须知道 active symlink 不是稳定的 TCC 合同。
 
 建议验收命令（不会重置权限，也不读取录音）：
 
 ```zsh
-command -v voice-memos-cli
-realpath "$(command -v voice-memos-cli)"
-codesign -d -vv "$(realpath "$(command -v voice-memos-cli)")" 2>&1 | rg 'Identifier|TeamIdentifier|Authority|Format'
-spctl --assess --type execute --verbose=4 "$(realpath "$(command -v voice-memos-cli)")"
-tccutil reset SystemPolicyAllFiles com.patrickfu.voice-memos-cli
-# 当前只读产品不使用 Accessibility/Apple Events；如未来研究需要隔离测试，再单独评估。
+command -v vmemo
+realpath "$(command -v vmemo)"
+codesign -d -vv "$(realpath "$(command -v vmemo)")" 2>&1 | rg 'Identifier|TeamIdentifier|Authority|Format'
+spctl --assess --type execute --verbose=4 "$(realpath "$(command -v vmemo)")"
+# 不在分发验收中重置 TCC；当前只读产品也不使用 Accessibility/Apple Events。
 ```
 
 ## 7. CI 分层：无凭据与有凭据 release gates

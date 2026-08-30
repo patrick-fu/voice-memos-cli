@@ -3,11 +3,11 @@ import XCTest
 @testable import VMemo
 
 final class VMemoCLITests: XCTestCase {
-    func testVersionPrintsExactDevelopmentVersionAndSucceeds() throws {
+    func testVersionPrintsExactReleaseVersionAndSucceeds() throws {
         let result = try runVMemo("--version")
 
         XCTAssertEqual(result.status, 0)
-        XCTAssertEqual(result.stdout, "0.1.0-dev\n")
+        XCTAssertEqual(result.stdout, "0.1.0\n")
         XCTAssertEqual(result.stderr, "")
     }
 
