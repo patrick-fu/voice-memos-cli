@@ -57,7 +57,7 @@ struct CommandRunner: Sendable {
                 return success(recording, human: render(recording), output: output)
             case let .export(id, destination):
                 let receipt = try asset.export(id: id, destination: destination)
-                return success(receipt, human: "Exported \(receipt.id).\n", output: output)
+                return success(receipt, human: "Exported \(receipt.id) to \(receipt.destination).\n", output: output)
             case .doctor:
                 do {
                     return diagnostic(try doctor.inspect(), output: output)
@@ -72,6 +72,8 @@ struct CommandRunner: Sendable {
             }
         } catch let error as VMemoError {
             return failure(error, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
+        } catch let error as ProductionSystemConfigurationFailure {
+            return failure(code: error.code, message: error.message, exitCode: ProcessExit.safetyFailure.rawValue, output: output)
         } catch let error as SchemaAdapterError {
             return failure(code: error.code, message: error.message, exitCode: error.exitCode, output: output)
         } catch let error as ProductionRecordingAdapterError {

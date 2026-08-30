@@ -42,6 +42,11 @@ protocol DoctorEnvironment: Sendable {
     func voiceMemosApplication() -> DoctorApplicationMetadata?
     func library() -> DoctorLibraryMetadata
     func signing() -> DoctorSigningMetadata
+    func productionContext() -> DoctorProductionContext
+}
+
+extension DoctorEnvironment {
+    func productionContext() -> DoctorProductionContext { .disabled }
 }
 
 protocol DoctorApplicationMetadataResolver: Sendable {
@@ -55,6 +60,41 @@ struct DoctorRuntime: Sendable {
 
 struct DoctorApplicationMetadata: Sendable {
     let version: String
+    let build: String
+
+    init(version: String, build: String = "unknown") {
+        self.version = version
+        self.build = build
+    }
+}
+
+enum DoctorSchemaProbeResult: Equatable, Sendable {
+    case recognized
+    case unsupported
+    case snapshotCreationFailure
+    case snapshotCleanupFailure
+}
+
+struct DoctorSchemaProbe: Sendable {
+    let run: @Sendable () -> DoctorSchemaProbeResult
+}
+
+struct DoctorProductionContext: Sendable {
+    let recordingsRoot: URL?
+    let schemaProbe: DoctorSchemaProbe?
+    let configurationFailure: ProductionSystemConfigurationFailure?
+
+    init(
+        recordingsRoot: URL? = nil,
+        schemaProbe: DoctorSchemaProbe? = nil,
+        configurationFailure: ProductionSystemConfigurationFailure? = nil
+    ) {
+        self.recordingsRoot = recordingsRoot
+        self.schemaProbe = schemaProbe
+        self.configurationFailure = configurationFailure
+    }
+
+    static let disabled = DoctorProductionContext()
 }
 
 enum DoctorLibraryMetadata: Sendable {
@@ -81,24 +121,25 @@ struct SystemDoctorPort: DoctorPort {
         let application = environment.voiceMemosApplication()
         let library = environment.library()
         let signing = environment.signing()
+        let productionContext = environment.productionContext()
 
         let checks = [
             runtimeCheck(runtime),
             applicationCheck(application),
-            libraryCheck(library),
-            schemaCheck(),
+            libraryCheck(library, recordingsRoot: productionContext.recordingsRoot),
+            schemaCheck(productionContext),
             signingCheck(signing),
         ]
         return DoctorReport(status: reportStatus(for: checks), checks: checks)
     }
 
     private func runtimeCheck(_ runtime: DoctorRuntime) -> DoctorCheck {
-        guard [15, 26].contains(runtime.osMajor) else {
+        guard runtime.osMajor == 26 else {
             return DoctorCheck(
                 id: "runtime",
                 status: .blocked,
                 code: "unsupported_os",
-                details: ["macOS \(runtime.osMajor)", "Supported macOS versions: 15, 26."]
+                details: ["macOS \(runtime.osMajor)", "Supported production runtime: macOS 26.", ProductVersion.displayName]
             )
         }
         guard ["arm64", "x86_64"].contains(runtime.architecture) else {
@@ -106,14 +147,14 @@ struct SystemDoctorPort: DoctorPort {
                 id: "runtime",
                 status: .blocked,
                 code: "unsupported_architecture",
-                details: [runtime.architecture, "Supported architectures: arm64, x86_64."]
+                details: [runtime.architecture, "Supported architectures: arm64, x86_64.", ProductVersion.displayName]
             )
         }
         return DoctorCheck(
             id: "runtime",
             status: .ready,
             code: "runtime_supported",
-            details: ["macOS \(runtime.osMajor)", runtime.architecture]
+            details: ["macOS \(runtime.osMajor)", runtime.architecture, ProductVersion.displayName]
         )
     }
 
@@ -126,24 +167,37 @@ struct SystemDoctorPort: DoctorPort {
                 details: ["Voice Memos application metadata was not found."]
             )
         }
+        guard application.build == "1380" else {
+            return DoctorCheck(
+                id: "voice_memos",
+                status: .blocked,
+                code: "unsupported_voice_memos_build",
+                details: [
+                    "short version \(application.version)",
+                    "build \(application.build)",
+                    "Supported build: 1380.",
+                ]
+            )
+        }
         return DoctorCheck(
             id: "voice_memos",
             status: .ready,
             code: "app_available",
-            details: ["version \(application.version)"]
+            details: ["short version \(application.version)", "build \(application.build)"]
         )
     }
 
-    private func libraryCheck(_ library: DoctorLibraryMetadata) -> DoctorCheck {
+    private func libraryCheck(_ library: DoctorLibraryMetadata, recordingsRoot: URL?) -> DoctorCheck {
+        let rootDetail = recordingsRoot.map { ["Configured recordings root: \($0.path)."] } ?? []
         switch library {
         case .unconfigured:
-            DoctorCheck(id: "library", status: .incomplete, code: "library_not_configured", details: ["No library path is configured."])
+            return DoctorCheck(id: "library", status: .incomplete, code: "library_not_configured", details: ["No library path is configured."])
         case .available:
-            DoctorCheck(id: "library", status: .ready, code: "library_accessible", details: ["Configured library path metadata is accessible."])
+            return DoctorCheck(id: "library", status: .ready, code: "library_accessible", details: rootDetail)
         case .missing:
-            DoctorCheck(id: "library", status: .blocked, code: "library_path_missing", details: ["Configured library path does not exist."])
+            return DoctorCheck(id: "library", status: .blocked, code: "library_path_missing", details: rootDetail)
         case .inaccessible:
-            DoctorCheck(id: "library", status: .blocked, code: "library_path_inaccessible", details: ["Configured library path metadata is inaccessible."])
+            return DoctorCheck(id: "library", status: .blocked, code: "library_path_inaccessible", details: rootDetail)
         }
     }
 
@@ -156,13 +210,54 @@ struct SystemDoctorPort: DoctorPort {
         }
     }
 
-    private func schemaCheck() -> DoctorCheck {
-        DoctorCheck(
-            id: "schema",
-            status: .incomplete,
-            code: "schema_not_inspected",
-            details: ["No recording database was opened."]
-        )
+    private func schemaCheck(_ context: DoctorProductionContext) -> DoctorCheck {
+        if let failure = context.configurationFailure {
+            return DoctorCheck(
+                id: "schema",
+                status: .blocked,
+                code: failure.code,
+                details: failure.doctorDetails
+            )
+        }
+        let probe = context.schemaProbe
+        guard let probe else {
+            return DoctorCheck(
+                id: "schema",
+                status: .blocked,
+                code: "schema_not_configured",
+                details: ["Production schema evidence was not configured."]
+            )
+        }
+        switch probe.run() {
+        case .recognized:
+            return DoctorCheck(
+                id: "schema",
+                status: .ready,
+                code: "schema_recognized",
+                details: ["Exact production store schema was recognized from metadata only."]
+            )
+        case .unsupported:
+            return DoctorCheck(
+                id: "schema",
+                status: .blocked,
+                code: "unsupported_schema",
+                details: ["The production store metadata does not match the supported schema."]
+            )
+        case .snapshotCreationFailure:
+            return DoctorCheck(
+                id: "schema",
+                status: .blocked,
+                code: "snapshot_creation_failed",
+                details: ["A metadata-only production schema snapshot could not be created."]
+            )
+        case .snapshotCleanupFailure:
+            return DoctorCheck(
+                id: "schema",
+                status: .blocked,
+                code: "snapshot_cleanup_failed",
+                details: ["A metadata-only production schema snapshot could not be removed."]
+            )
+        }
     }
 
     private func reportStatus(for checks: [DoctorCheck]) -> DoctorReportStatus {
@@ -173,14 +268,17 @@ struct SystemDoctorPort: DoctorPort {
 }
 
 struct SystemDoctorEnvironment: DoctorEnvironment {
+    private let context: DoctorProductionContext
     private let libraryURL: URL?
     private let applicationResolver: any DoctorApplicationMetadataResolver
 
     init(
         libraryURL: URL? = nil,
+        context: DoctorProductionContext = .disabled,
         applicationResolver: any DoctorApplicationMetadataResolver = SystemVoiceMemosApplicationMetadataResolver()
     ) {
-        self.libraryURL = libraryURL
+        self.context = context
+        self.libraryURL = context.recordingsRoot ?? libraryURL
         self.applicationResolver = applicationResolver
     }
 
@@ -226,6 +324,8 @@ struct SystemDoctorEnvironment: DoctorEnvironment {
         "unknown"
         #endif
     }
+
+    func productionContext() -> DoctorProductionContext { context }
 }
 
 struct SystemVoiceMemosApplicationMetadataResolver: DoctorApplicationMetadataResolver {
@@ -242,7 +342,8 @@ struct SystemVoiceMemosApplicationMetadataResolver: DoctorApplicationMetadataRes
         for url in candidateURLs {
             guard let bundle = Bundle(url: url), bundle.bundleIdentifier == "com.apple.VoiceMemos" else { continue }
             let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
-            return DoctorApplicationMetadata(version: stableMetadataValue(version))
+            let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+            return DoctorApplicationMetadata(version: stableMetadataValue(version), build: stableMetadataValue(build))
         }
         return nil
     }

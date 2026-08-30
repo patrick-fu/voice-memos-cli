@@ -4,7 +4,7 @@
 
 ## 结论
 
-**production 真实 read 仅在 exact macOS 26 build-1380 contract 下可用；mutation 仍 blocked。** macOS 26 的 bundle、store metadata、physical schema 与下列行级条件共同构成 fail-closed gate。
+**production 真实 read 仅在 exact macOS 26 build-1380 contract 下可用；mutation 不在产品范围。** macOS 26 的 bundle、store metadata、physical schema 与下列行级条件共同构成 fail-closed gate。
 
 - 当前 build manifest 之外的 Title 语义，或 sorting/encrypted 两字段不一致时的 fallback；
 - 哪些 `ZCLOUDRECORDING` 行处于正常资料库、Recently Deleted、云端占位或已驱逐状态；

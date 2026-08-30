@@ -3,6 +3,14 @@ import XCTest
 @testable import VMemo
 
 final class VMemoCLITests: XCTestCase {
+    func testVersionPrintsExactDevelopmentVersionAndSucceeds() throws {
+        let result = try runVMemo("--version")
+
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(result.stdout, "0.1.0-dev\n")
+        XCTAssertEqual(result.stderr, "")
+    }
+
     func testHelpDiscoversFlatCommands() throws {
         let result = try runVMemo("--help")
 
@@ -36,6 +44,17 @@ final class VMemoCLITests: XCTestCase {
                 XCTAssertTrue(help.contains(section), "missing \(section) in \(command) help")
             }
         }
+    }
+
+    func testSearchHelpStatesThatSearchIsTitleOnly() throws {
+        let result = try runVMemo("search", "--help")
+
+        XCTAssertEqual(result.status, 0)
+        let help = normalizedHelp(result.stdout).lowercased()
+        XCTAssertTrue(
+            help.contains("titles only") || help.contains("title only") || help.contains("title-only"),
+            "search help must explicitly limit matching to titles"
+        )
     }
 
     func testHelpExamplesReachAdapterLayerInsteadOfUsageErrors() throws {
@@ -96,6 +115,22 @@ final class VMemoCLITests: XCTestCase {
             XCTAssertEqual(envelope["version"] as? Int, 1, "arguments: \(arguments)")
             XCTAssertEqual(envelope["status"] as? String, "error", "arguments: \(arguments)")
             XCTAssertEqual((envelope["error"] as? [String: Any])?["code"] as? String, "usage_error", "arguments: \(arguments)")
+        }
+    }
+
+    func testRemovedWriteAndUICommandsUseHumanUsageError() throws {
+        let argumentCases = [
+            ["unknown-command"],
+            ["rename"],
+            ["delete"],
+            ["doctor", "--ui"],
+        ]
+
+        for arguments in argumentCases {
+            let result = try runVMemo(arguments)
+            XCTAssertEqual(result.status, 2, "arguments: \(arguments)")
+            XCTAssertEqual(result.stdout, "", "arguments: \(arguments)")
+            XCTAssertTrue(result.stderr.contains("error:"), "arguments: \(arguments)")
         }
     }
 
@@ -161,6 +196,23 @@ final class VMemoCLITests: XCTestCase {
             "show:recording:fixture",
             "export:recording:fixture:/tmp/export.m4a"
         ])
+    }
+
+    func testHumanExportReceiptIncludesDestination() {
+        let destination = "/tmp/export-receipt.m4a"
+        let runner = CommandRunner(
+            read: FixtureReadPort(recordings: [], calls: CallLog()),
+            asset: FixtureAssetPort(calls: CallLog())
+        )
+
+        let result = runner.run(
+            .export(id: RecordingID(value: "recording:fixture"), destination: destination),
+            output: .human
+        )
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(result.stderr, "")
+        XCTAssertTrue(result.stdout.contains(destination))
     }
 
     func testSuccessEncodingFailureReturnsOperationalErrorInsteadOfEmptySuccess() throws {

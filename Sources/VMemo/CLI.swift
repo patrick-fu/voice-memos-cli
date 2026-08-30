@@ -17,6 +17,7 @@ struct VMemo: ParsableCommand {
           vmemo list --json
           vmemo show --id opaque-recording-id --json
         """,
+        version: ProductVersion.current,
         subcommands: [List.self, Search.self, Show.self, Export.self, Doctor.self]
     )
 }
@@ -29,12 +30,21 @@ enum VMemoApplication {
         } catch let exitCode as ExitCode {
             exit(exitCode.rawValue)
         } catch {
+            if VMemo.exitCode(for: error).isSuccess {
+                VMemo.exit(withError: error)
+            }
             if CommandLine.arguments.contains("--json") {
                 let result = CommandResult.usage(message: VMemo.fullMessage(for: error))
                 ProcessIO.write(result)
                 exit(result.exitCode)
             }
-            VMemo.exit(withError: error)
+            let result = CommandResult(
+                exitCode: ProcessExit.usage.rawValue,
+                stdout: "",
+                stderr: "error: \(VMemo.message(for: error))\nUsage: vmemo <subcommand>\n"
+            )
+            ProcessIO.write(result)
+            exit(result.exitCode)
         }
     }
 }
@@ -69,7 +79,7 @@ private struct Search: RoutedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Search recordings.",
         usage: "vmemo search --query <text> [--json]",
-        discussion: "Search recording titles. Example: vmemo search --query meeting --json"
+        discussion: "Search titles only; recording content is not searched. Example: vmemo search --query meeting --json"
     )
     @Option(name: .long, help: "Search text.") var query: String
     @OptionGroup var output: OutputOptions

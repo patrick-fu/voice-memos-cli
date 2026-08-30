@@ -57,6 +57,12 @@ final class DoctorTests: XCTestCase {
         XCTAssertEqual(check(named: "runtime", in: supported).status, .ready)
         XCTAssertEqual(check(named: "runtime", in: supported).code, "runtime_supported")
 
+        let macOS15 = try SystemDoctorPort(
+            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 15, architecture: "arm64"))
+        ).inspect()
+        XCTAssertEqual(check(named: "runtime", in: macOS15).status, .blocked)
+        XCTAssertEqual(check(named: "runtime", in: macOS15).code, "unsupported_os")
+
         let futureOS = try SystemDoctorPort(
             environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 27, architecture: "arm64"))
         ).inspect()
@@ -64,10 +70,41 @@ final class DoctorTests: XCTestCase {
         XCTAssertEqual(check(named: "runtime", in: futureOS).code, "unsupported_os")
 
         let unknownArchitecture = try SystemDoctorPort(
-            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 15, architecture: "unknown"))
+            environment: DoctorEnvironmentFixture(runtimeValue: DoctorRuntime(osMajor: 26, architecture: "unknown"))
         ).inspect()
         XCTAssertEqual(check(named: "runtime", in: unknownArchitecture).status, .blocked)
         XCTAssertEqual(check(named: "runtime", in: unknownArchitecture).code, "unsupported_architecture")
+    }
+
+    func testBuild1380AndRecognizedSchemaProduceReadyReportWithStableOrderAndVersionDetail() throws {
+        let report = try SystemDoctorPort(
+            environment: ProductionDoctorEnvironment(
+                application: DoctorApplicationMetadata(version: "2.0", build: "1380"),
+                schema: .recognized
+            )
+        ).inspect()
+
+        XCTAssertEqual(report.status, .ready)
+        XCTAssertEqual(report.checks.map(\.id), ["runtime", "voice_memos", "library", "schema", "signing"])
+        XCTAssertTrue(report.checks.allSatisfy { $0.status == .ready })
+        XCTAssertTrue(check(named: "runtime", in: report).details.contains(ProductVersion.current))
+        XCTAssertEqual(check(named: "voice_memos", in: report).code, "app_available")
+        XCTAssertEqual(check(named: "schema", in: report).status, .ready)
+    }
+
+    func testUnsupportedBuildAndSchemaProbeFailuresBlockWithoutOpeningRealLibrary() throws {
+        for (application, schema, expectedCode) in [
+            (DoctorApplicationMetadata(version: "2.0", build: "1379"), DoctorSchemaProbeResult.recognized, "unsupported_voice_memos_build"),
+            (DoctorApplicationMetadata(version: "2.0", build: "1380"), DoctorSchemaProbeResult.unsupported, "unsupported_schema"),
+            (DoctorApplicationMetadata(version: "2.0", build: "1380"), DoctorSchemaProbeResult.snapshotCreationFailure, "snapshot_creation_failed"),
+            (DoctorApplicationMetadata(version: "2.0", build: "1380"), DoctorSchemaProbeResult.snapshotCleanupFailure, "snapshot_cleanup_failed"),
+        ] {
+            let report = try SystemDoctorPort(
+                environment: ProductionDoctorEnvironment(application: application, schema: schema)
+            ).inspect()
+            XCTAssertEqual(report.status, .blocked)
+            XCTAssertEqual(report.checks.first(where: { $0.code == expectedCode })?.status, .blocked)
+        }
     }
 
     func testApplicationResolverRejectsSameNamedApplicationsWithoutVoiceMemosBundleID() throws {
@@ -178,7 +215,7 @@ private enum FixtureDoctorError: Error {
 
 private struct ReadyDoctorEnvironment: DoctorEnvironment {
     func runtime() -> DoctorRuntime { DoctorRuntime(osMajor: 15, architecture: "arm64") }
-    func voiceMemosApplication() -> DoctorApplicationMetadata? { DoctorApplicationMetadata(version: "2.0") }
+    func voiceMemosApplication() -> DoctorApplicationMetadata? { DoctorApplicationMetadata(version: "2.0", build: "1380") }
     func library() -> DoctorLibraryMetadata { .unconfigured }
     func signing() -> DoctorSigningMetadata { .available }
 }
@@ -191,9 +228,33 @@ private struct DoctorEnvironmentFixture: DoctorEnvironment {
     }
 
     func runtime() -> DoctorRuntime { runtimeValue }
-    func voiceMemosApplication() -> DoctorApplicationMetadata? { DoctorApplicationMetadata(version: "2.0") }
+    func voiceMemosApplication() -> DoctorApplicationMetadata? { DoctorApplicationMetadata(version: "2.0", build: "1380") }
     func library() -> DoctorLibraryMetadata { .unconfigured }
     func signing() -> DoctorSigningMetadata { .available }
+}
+
+private struct ProductionDoctorEnvironment: DoctorEnvironment {
+    let application: DoctorApplicationMetadata
+    let schema: DoctorSchemaProbeResult
+    let root: URL
+
+    init(application: DoctorApplicationMetadata, schema: DoctorSchemaProbeResult) {
+        self.application = application
+        self.schema = schema
+        self.root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vmemo-doctor-synthetic-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    func runtime() -> DoctorRuntime { DoctorRuntime(osMajor: 26, architecture: "arm64") }
+    func voiceMemosApplication() -> DoctorApplicationMetadata? { application }
+    func library() -> DoctorLibraryMetadata { .available }
+    func signing() -> DoctorSigningMetadata { .available }
+    func productionContext() -> DoctorProductionContext {
+        DoctorProductionContext(
+            recordingsRoot: root,
+            schemaProbe: DoctorSchemaProbe(run: { schema })
+        )
+    }
 }
 
 private final class RecordingPortCallSpy: @unchecked Sendable {
