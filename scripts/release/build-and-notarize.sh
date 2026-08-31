@@ -140,6 +140,7 @@ cleanup() {
     rm -rf "$work_dir"
     if ! "$release_succeeded"; then
         rm -f "$package_path" "$DIST_DIR/SHA256SUMS" "$DIST_DIR/provenance.json"
+        rmdir "$DIST_DIR" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT
@@ -184,7 +185,8 @@ x86_64_binary="$(find_built_executable "$x86_64_scratch")"
 [[ "$(lipo -archs "$x86_64_binary")" == "x86_64" ]] || fail "x86_64 build is not a single x86_64 slice"
 
 lipo -create "$arm64_binary" "$x86_64_binary" -output "$universal_binary"
-[[ "$(lipo -archs "$universal_binary")" == "arm64 x86_64" ]] || fail "universal executable does not contain exactly arm64 and x86_64"
+architecture_set="$(lipo -archs "$universal_binary" | tr ' ' '\n' | sort | paste -sd ' ' -)"
+[[ "$architecture_set" == "arm64 x86_64" ]] || fail "universal executable does not contain exactly arm64 and x86_64"
 
 verify_deployment_target() {
     local architecture="$1"
