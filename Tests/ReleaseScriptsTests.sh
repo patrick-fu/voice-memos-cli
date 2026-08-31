@@ -28,11 +28,11 @@ require_source 'spctl --assess --type execute --verbose=4 "$candidate"' "$INSTAL
 require_source 'binary is not universal2' "$INSTALL_SCRIPT"
 require_source 'mv -f "$staged_binary" "$install_dir/$EXECUTABLE_NAME"' "$INSTALL_SCRIPT"
 
-spctl_line="$(rg -n 'spctl --assess --type execute --verbose=4 \"\$candidate\"' "$INSTALL_SCRIPT" | cut -d: -f1)"
-version_line="$(rg -n 'binary version does not match VMEMO_VERSION' "$INSTALL_SCRIPT" | cut -d: -f1)"
+spctl_line="$(awk '/spctl --assess --type execute --verbose=4 \"\$candidate\"/ { print NR }' "$INSTALL_SCRIPT")"
+version_line="$(awk '/binary version does not match VMEMO_VERSION/ { print NR }' "$INSTALL_SCRIPT")"
 [[ "$spctl_line" -lt "$version_line" ]] || fail 'downloaded binary version is checked before Gatekeeper assessment'
 
-if rg -n 'VMEMO_INSTALLER_IDENTITY|pkgbuild|productsign|pkgutil|stapler|INSTALL_LOCATION' "$BUILD_SCRIPT" "$INSTALL_SCRIPT"; then
+if grep -En 'VMEMO_INSTALLER_IDENTITY|pkgbuild|productsign|pkgutil|stapler|INSTALL_LOCATION' "$BUILD_SCRIPT" "$INSTALL_SCRIPT"; then
     fail 'obsolete PKG release path remains'
 fi
 
