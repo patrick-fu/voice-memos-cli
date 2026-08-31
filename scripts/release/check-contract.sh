@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-readonly EXPECTED_VERSION="0.1.1"
+readonly EXPECTED_VERSION="0.1.2"
 readonly EXPECTED_IDENTIFIER="com.paaatrick.voice-memos-cli"
 readonly EXPECTED_INSTALL_PATH='~/.local/bin/vmemo'
 readonly EXPECTED_DEPLOYMENT_TARGET="15.0"

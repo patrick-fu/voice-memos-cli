@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly REPOSITORY="patrick-fu/voice-memos-cli"
-readonly EXPECTED_VERSION="0.1.1"
+readonly EXPECTED_VERSION="0.1.2"
 readonly EXPECTED_IDENTIFIER="com.paaatrick.voice-memos-cli"
 readonly EXPECTED_TEAM_ID="9N7UKH59LC"
 readonly EXECUTABLE_NAME="vmemo"
@@ -39,7 +39,7 @@ download() {
 
 release_metadata="$work_dir/release.json"
 download "$release_api_url" "$release_metadata"
-plutil -lint "$release_metadata" >/dev/null || fail "GitHub Release metadata is not valid JSON"
+plutil -convert json -o /dev/null "$release_metadata" || fail "GitHub Release metadata is not valid JSON"
 [[ "$(plutil -extract tag_name raw "$release_metadata")" == "$release_tag" ]] || fail "GitHub Release tag does not match VMEMO_VERSION"
 [[ "$(plutil -extract immutable raw "$release_metadata")" == "true" ]] || fail "GitHub Release must be immutable"
 [[ "$(plutil -extract draft raw "$release_metadata")" == "false" ]] || fail "GitHub Release must not be a draft"
@@ -57,7 +57,7 @@ expected_checksum="${checksum_lines%% *}"
 actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
 [[ "$actual_checksum" == "$expected_checksum" ]] || fail "SHA-256 verification failed for $artifact_name"
 
-plutil -lint "$provenance_path" >/dev/null || fail "provenance.json is not valid JSON"
+plutil -convert json -o /dev/null "$provenance_path" || fail "provenance.json is not valid JSON"
 [[ "$(plutil -extract artifact raw "$provenance_path")" == "$artifact_name" ]] || fail "provenance artifact does not match download"
 [[ "$(plutil -extract version raw "$provenance_path")" == "$version" ]] || fail "provenance version does not match download"
 [[ "$(plutil -extract identifier raw "$provenance_path")" == "$EXPECTED_IDENTIFIER" ]] || fail "provenance identifier is unexpected"

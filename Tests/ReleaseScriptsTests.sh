@@ -20,6 +20,8 @@ require_source "codesign -vvvv -R='notarized' --check-notarization \"\$universal
 require_source "PATH='/usr/bin:/bin:/usr/sbin:/sbin'" "$BUILD_SCRIPT"
 require_source 'shasum -a 256 "$ARTIFACT_NAME" > SHA256SUMS' "$BUILD_SCRIPT"
 require_source 'readonly EXPECTED_TEAM_ID="9N7UKH59LC"' "$INSTALL_SCRIPT"
+require_source 'plutil -convert json -o /dev/null "$release_metadata"' "$INSTALL_SCRIPT"
+require_source 'plutil -convert json -o /dev/null "$provenance_path"' "$INSTALL_SCRIPT"
 require_source "PATH='/usr/bin:/bin:/usr/sbin:/sbin'" "$INSTALL_SCRIPT"
 require_source 'GitHub Release must be immutable' "$INSTALL_SCRIPT"
 require_source 'SHA-256 verification failed' "$INSTALL_SCRIPT"

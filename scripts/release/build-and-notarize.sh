@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-readonly VERSION="0.1.1"
+readonly VERSION="0.1.2"
 readonly IDENTIFIER="com.paaatrick.voice-memos-cli"
 readonly EXECUTABLE_NAME="vmemo"
 readonly DEPLOYMENT_TARGET="15.0"
@@ -22,8 +22,8 @@ usage() {
     cat <<'USAGE'
 Usage: scripts/release/build-and-notarize.sh [options]
 
-Builds, signs, notarizes, and verifies the v0.1.1 universal2 ZIP release artifact.
-It refuses to reuse or overwrite dist/v0.1.1 and never modifies prior release output.
+Builds, signs, notarizes, and verifies the v0.1.2 universal2 ZIP release artifact.
+It refuses to reuse or overwrite dist/v0.1.2 and never modifies prior release output.
 
 Options:
   --application-identity VALUE  Developer ID Application identity (or VMEMO_APPLICATION_IDENTITY)

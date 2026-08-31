@@ -4,9 +4,9 @@ Safe, agent-friendly, read-only access to Apple Voice Memos on macOS. `vmemo` li
 
 面向 agent 的安全只读 macOS 命令行工具。`vmemo` 可列出、搜索、查看和导出录音副本；绝不重命名、删除或写入 Voice Memos。
 
-> **Production contract / 生产契约** — v0.1.1 production data access is intentionally narrow: **macOS 26 with Voice Memos build 1380 only**. Any other environment fails closed rather than guessing at a private data format.
+> **Production contract / 生产契约** — v0.1.2 production data access is intentionally narrow: **macOS 26 with Voice Memos build 1380 only**. Any other environment fails closed rather than guessing at a private data format.
 >
-> v0.1.1 的生产数据访问刻意限定为 **macOS 26 且 Voice Memos build 1380**；其他环境会安全拒绝，不会猜测私有数据格式。
+> v0.1.2 的生产数据访问刻意限定为 **macOS 26 且 Voice Memos build 1380**；其他环境会安全拒绝，不会猜测私有数据格式。
 
 ## What it does / 能力
 
@@ -26,24 +26,24 @@ Safe, agent-friendly, read-only access to Apple Voice Memos on macOS. `vmemo` li
 
 ### One-line installer (recommended) / 一行安装（推荐）
 
-The v0.1.1 release channel is an Apple-notarized universal2 ZIP published to an immutable GitHub Release, installed by a version-pinned script. No sudo, no installer GUI, and no PKG.
+The v0.1.2 release channel is an Apple-notarized universal2 ZIP published to an immutable GitHub Release, installed by a version-pinned script. No sudo, no installer GUI, and no PKG.
 
-v0.1.1 的发布渠道是放在不可变 GitHub Release 上的 Apple 公证 universal2 ZIP，由固定版本的安装脚本完成安装；不需要 sudo，不弹安装器，也不再使用 PKG。
+v0.1.2 的发布渠道是放在不可变 GitHub Release 上的 Apple 公证 universal2 ZIP，由固定版本的安装脚本完成安装；不需要 sudo，不弹安装器，也不再使用 PKG。
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.2/install.sh | sh
 ```
 
 The script installs `~/.local/bin/vmemo` and stops before writing anything unless every check passes:
 
 脚本把 `vmemo` 安装到 `~/.local/bin/vmemo`；以下任一项不通过都会在写入前中止：
 
-- The release is marked immutable, and `vmemo-0.1.1-macos-universal2.zip` matches its `SHA256SUMS` entry.
+- The release is marked immutable, and `vmemo-0.1.2-macos-universal2.zip` matches its `SHA256SUMS` entry.
 - The executable is signed by a `Developer ID Application` identity for `com.paaatrick.voice-memos-cli` and Team ID `9N7UKH59LC`, carries a secure timestamp and Hardened Runtime, and satisfies `codesign`'s online `notarized` requirement.
 - The binary contains both `arm64` and `x86_64` slices and reports the expected version, consistent with `provenance.json`.
 - The new binary replaces an existing `vmemo` in the same directory atomically, so a failed install leaves the previous one in place.
 
-- Release 已标记为不可变，且 `vmemo-0.1.1-macos-universal2.zip` 与 `SHA256SUMS` 记录的校验和一致。
+- Release 已标记为不可变，且 `vmemo-0.1.2-macos-universal2.zip` 与 `SHA256SUMS` 记录的校验和一致。
 - 可执行文件由 `Developer ID Application` 身份签名，identifier 为 `com.paaatrick.voice-memos-cli`、Team ID 为 `9N7UKH59LC`，带安全时间戳与 Hardened Runtime，并满足 `codesign` 在线 `notarized` 要求。
 - 二进制同时包含 `arm64` 与 `x86_64` slice，报告的版本号符合预期，并与 `provenance.json` 一致。
 - 新版本在同一目录内原子替换旧 `vmemo`，安装失败不会破坏已有安装。
@@ -71,13 +71,13 @@ Installing needs no Full Disk Access because it only writes to the install direc
 
 ### Manual download / 手动下载
 
-You can also download `vmemo-0.1.1-macos-universal2.zip`, `SHA256SUMS`, and `provenance.json` from [GitHub Releases](https://github.com/patrick-fu/voice-memos-cli/releases) and put the binary, which the archive holds at `vmemo-0.1.1-macos-universal2/vmemo`, anywhere on your `PATH`. A bare executable cannot carry a stapled ticket, so Gatekeeper checks the notarization ticket online on first use.
+You can also download `vmemo-0.1.2-macos-universal2.zip`, `SHA256SUMS`, and `provenance.json` from [GitHub Releases](https://github.com/patrick-fu/voice-memos-cli/releases) and put the binary, which the archive holds at `vmemo-0.1.2-macos-universal2/vmemo`, anywhere on your `PATH`. A bare executable cannot carry a stapled ticket, so Gatekeeper checks the notarization ticket online on first use.
 
 ```sh
 shasum -a 256 -c SHA256SUMS
 ```
 
-也可以从 [GitHub Releases](https://github.com/patrick-fu/voice-memos-cli/releases) 下载 `vmemo-0.1.1-macos-universal2.zip`、`SHA256SUMS` 与 `provenance.json`，压缩包内的二进制位于 `vmemo-0.1.1-macos-universal2/vmemo`，把它放到 `PATH` 上的任意目录即可。裸可执行文件无法 staple 公证票据，因此 Gatekeeper 会在线校验公证状态。
+也可以从 [GitHub Releases](https://github.com/patrick-fu/voice-memos-cli/releases) 下载 `vmemo-0.1.2-macos-universal2.zip`、`SHA256SUMS` 与 `provenance.json`，压缩包内的二进制位于 `vmemo-0.1.2-macos-universal2/vmemo`，把它放到 `PATH` 上的任意目录即可。裸可执行文件无法 staple 公证票据，因此 Gatekeeper 会在线校验公证状态。
 
 ### Build from source / 源码构建
 
@@ -178,7 +178,7 @@ Tests use isolated synthetic fixtures; do not point development overrides at a r
 
 ## Links and evidence / 链接与证据
 
-- [Repository](https://github.com/patrick-fu/voice-memos-cli) · [Releases](https://github.com/patrick-fu/voice-memos-cli/releases) · [Release notes / 发行说明](release-notes/v0.1.1.md) · [Planning record / 规划记录](https://github.com/patrick-fu/voice-memos-cli/issues/1)
+- [Repository](https://github.com/patrick-fu/voice-memos-cli) · [Releases](https://github.com/patrick-fu/voice-memos-cli/releases) · [Release notes / 发行说明](release-notes/v0.1.2.md) · [Planning record / 规划记录](https://github.com/patrick-fu/voice-memos-cli/issues/1)
 - [Documentation / 文档](docs/agent-contract.md) · [Research / 调研](docs/research)
 - [Project Pages / 项目 Pages](https://patrick-fu.github.io/voice-memos-cli/)
 

@@ -2,7 +2,7 @@
 
 > **当前产品决策（2026-08-30）：** `voice-memos-cli` 当前是安全只读检索/导出 CLI，只支持 `list/search/show/export/doctor`；不支持 `rename/delete`，不要求也不使用 Accessibility、CGEvent、mutation token 或 Shortcuts 写后端。分发链条只需要覆盖只读产品所需的用户授权和安装路径，Accessibility/Apple Events 验证不属于当前产品分发范围；本文保留为历史/决策证据。
 
-> **v0.1.1 分发更新：**本文保留 v0.1.0 选择 PKG 的历史调研与离线 stapling 权衡。项目自 v0.1.1 起不再以 PKG 分发，正式渠道改为 Developer ID Application 签名、Apple 公证的 universal2 ZIP，并由固定 tag 的 `install.sh` 在线校验后安装到 `~/.local/bin/vmemo`；裸 Mach-O 无法 staple，因此不承诺离线首次验证。当前安装契约以 [README](../../README.md) 与发布脚本为准。
+> **v0.1.2 分发更新：**本文保留 v0.1.0 选择 PKG 的历史调研与离线 stapling 权衡。项目当前不再以 PKG 分发，正式渠道为 Developer ID Application 签名、Apple 公证的 universal2 ZIP，并由固定 tag 的 `install.sh` 在线校验后安装到 `~/.local/bin/vmemo`；裸 Mach-O 无法 staple，因此不承诺离线首次验证。当前安装契约以 [README](../../README.md) 与发布脚本为准。
 
 研究日期：2026-08-28。目标是为 `voice-memos-cli` 的 v0.1 选择可复现的 macOS、CPU、Swift 工具链、签名/公证、GitHub Releases 与 Homebrew 发布路径。本报告只读取公开一手资料和仓库静态文件；没有读取 Voice Memos 用户数据、凭据，也没有执行签名、公证、发布或 GitHub 写操作。
 
