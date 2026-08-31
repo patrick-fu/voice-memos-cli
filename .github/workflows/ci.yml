@@ -38,5 +38,8 @@ jobs:
       - name: Run tests
         run: swift test --parallel
 
+      - name: Validate release and installer scripts
+        run: bash Tests/ReleaseScriptsTests.sh
+
       - name: Build with strict concurrency
         run: swift build -Xswiftc -strict-concurrency=complete

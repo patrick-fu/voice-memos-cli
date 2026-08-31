@@ -2,9 +2,9 @@
 set -euo pipefail
 
 readonly REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-readonly EXPECTED_VERSION="0.1.0"
+readonly EXPECTED_VERSION="0.1.1"
 readonly EXPECTED_IDENTIFIER="com.paaatrick.voice-memos-cli"
-readonly EXPECTED_INSTALL_PATH="/usr/local/bin/vmemo"
+readonly EXPECTED_INSTALL_PATH='~/.local/bin/vmemo'
 readonly EXPECTED_DEPLOYMENT_TARGET="15.0"
 readonly EXPECTED_PRODUCTION_OS="26"
 readonly EXPECTED_VOICE_MEMOS_BUILD="1380"
@@ -26,9 +26,11 @@ require_exact_line "    static let current = \"${EXPECTED_VERSION}\"" "Sources/V
 require_exact_line "    platforms: [.macOS(.v15)]," "Package.swift"
 require_exact_line "readonly VERSION=\"${EXPECTED_VERSION}\"" "scripts/release/build-and-notarize.sh"
 require_exact_line "readonly IDENTIFIER=\"${EXPECTED_IDENTIFIER}\"" "scripts/release/build-and-notarize.sh"
-require_exact_line "readonly INSTALL_LOCATION=\"/usr/local/bin\"" "scripts/release/build-and-notarize.sh"
 require_exact_line "readonly EXECUTABLE_NAME=\"vmemo\"" "scripts/release/build-and-notarize.sh"
 require_exact_line "readonly DEPLOYMENT_TARGET=\"${EXPECTED_DEPLOYMENT_TARGET}\"" "scripts/release/build-and-notarize.sh"
+require_exact_line "readonly EXPECTED_VERSION=\"${EXPECTED_VERSION}\"" "install.sh"
+require_exact_line "readonly EXPECTED_IDENTIFIER=\"${EXPECTED_IDENTIFIER}\"" "install.sh"
+require_exact_line "readonly EXPECTED_TEAM_ID=\"9N7UKH59LC\"" "install.sh"
 grep -Fq "static let bundleBuild = \"${EXPECTED_VOICE_MEMOS_BUILD}\"" Sources/VMemo/RealSchemaRecognizer.swift \
     || fail "Voice Memos build contract is missing"
 grep -Fq "identity.osMajor == ${EXPECTED_PRODUCTION_OS}" Sources/VMemo/RealSchemaRecognizer.swift \

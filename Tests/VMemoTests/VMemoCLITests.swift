@@ -7,7 +7,7 @@ final class VMemoCLITests: XCTestCase {
         let result = try runVMemo("--version")
 
         XCTAssertEqual(result.status, 0)
-        XCTAssertEqual(result.stdout, "0.1.0\n")
+        XCTAssertEqual(result.stdout, "0.1.1\n")
         XCTAssertEqual(result.stderr, "")
     }
 

@@ -1,6 +1,6 @@
 # vmemo Agent Contract
 
-面向 agent 的稳定 CLI 合同。构建/安装方式与权限说明见 [README](../README.md)。本文只写当前源码构建产物实际实现的行为，不承诺尚未发布的 PKG、Homebrew、Release 或签名/公证产物。
+面向 agent 的稳定 CLI 合同。构建、安装与发行验证方式见 [README](../README.md)。本文只定义 CLI 行为，不重复承诺具体分发容器或未来安装渠道。
 
 ## 命令与参数
 
