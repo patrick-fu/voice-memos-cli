@@ -24,7 +24,7 @@ readonly artifact_name="$payload_name.zip"
 readonly release_base_url="https://github.com/$REPOSITORY/releases/download/$release_tag"
 readonly release_api_url="https://api.github.com/repos/$REPOSITORY/releases/tags/$release_tag"
 
-for tool in codesign curl find lipo plutil shasum spctl unzip; do
+for tool in codesign curl find lipo plutil shasum unzip; do
     command -v "$tool" >/dev/null 2>&1 || fail "required tool is unavailable: $tool"
 done
 
@@ -83,9 +83,9 @@ grep -Eq '^CodeDirectory .*flags=.*runtime' "$signature_info" || fail "binary do
 architectures="$(lipo -archs "$candidate" | tr ' ' '\n' | sort | paste -sd ' ' -)"
 [[ "$architectures" == "arm64 x86_64" ]] || fail "binary is not universal2"
 
-# ZIP archives and bare Mach-O executables cannot be stapled. Gatekeeper must verify this
-# notarized binary online before it is installed.
-spctl --assess --type execute --verbose=4 "$candidate"
+# ZIP archives and bare Mach-O executables cannot be stapled. Apple's supported
+# check for "other code" verifies the standalone binary's online notary ticket.
+codesign -vvvv -R='notarized' --check-notarization "$candidate"
 [[ "$("$candidate" --version)" == "$version" ]] || fail "binary version does not match VMEMO_VERSION"
 
 mkdir -p "$install_dir"

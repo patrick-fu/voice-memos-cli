@@ -33,8 +33,8 @@ Options:
   --help                        Show this help
 
 ZIP archives and bare Mach-O executables cannot be stapled. The release is notarized by
-submitting the ZIP; this script then checks the signed executable with codesign and online
-Gatekeeper assessment. It never creates a tag, GitHub Release, or installation.
+submitting the ZIP; this script then checks the standalone executable's online notary
+ticket with codesign. It never creates a tag, GitHub Release, or installation.
 USAGE
 }
 
@@ -61,7 +61,7 @@ require_value "Apple Developer Team ID" "$team_id"
 require_value "notarytool keychain profile" "$notary_profile"
 [[ "$team_id" =~ ^[A-Z0-9]{10}$ ]] || fail "Apple Developer Team ID must be ten uppercase letters or digits"
 
-for tool in codesign ditto find lipo plutil shasum spctl unzip xcrun; do
+for tool in codesign ditto find lipo plutil shasum unzip xcrun; do
     command -v "$tool" >/dev/null 2>&1 || fail "required tool is unavailable: $tool"
 done
 xcrun --find notarytool >/dev/null 2>&1 || fail "required tool is unavailable: notarytool"
@@ -172,8 +172,9 @@ if ! xcrun notarytool submit "$archive_path" --keychain-profile "$notary_profile
     fail "notarization submission failed"
 fi
 grep -Eq '"status"[[:space:]]*:[[:space:]]*"Accepted"' "$notarization_result" || fail "notarization was not accepted"
-# ZIP archives and bare Mach-O executables cannot be stapled; this must perform an online Gatekeeper lookup.
-spctl --assess --type execute --verbose=4 "$universal_binary"
+# ZIP archives and bare Mach-O executables cannot be stapled. For standalone
+# "other code", codesign checks the notary ticket published online by Apple.
+codesign -vvvv -R='notarized' --check-notarization "$universal_binary"
 
 (cd "$DIST_DIR" && shasum -a 256 "$ARTIFACT_NAME" > SHA256SUMS)
 provenance_plist="$work_dir/provenance.plist"

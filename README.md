@@ -39,12 +39,12 @@ The script installs `~/.local/bin/vmemo` and stops before writing anything unles
 脚本把 `vmemo` 安装到 `~/.local/bin/vmemo`；以下任一项不通过都会在写入前中止：
 
 - The release is marked immutable, and `vmemo-0.1.1-macos-universal2.zip` matches its `SHA256SUMS` entry.
-- The executable is signed by a `Developer ID Application` identity for `com.paaatrick.voice-memos-cli` and Team ID `9N7UKH59LC`, carries a secure timestamp and Hardened Runtime, and passes `spctl` assessment against Apple's notarization ticket.
+- The executable is signed by a `Developer ID Application` identity for `com.paaatrick.voice-memos-cli` and Team ID `9N7UKH59LC`, carries a secure timestamp and Hardened Runtime, and satisfies `codesign`'s online `notarized` requirement.
 - The binary contains both `arm64` and `x86_64` slices and reports the expected version, consistent with `provenance.json`.
 - The new binary replaces an existing `vmemo` in the same directory atomically, so a failed install leaves the previous one in place.
 
 - Release 已标记为不可变，且 `vmemo-0.1.1-macos-universal2.zip` 与 `SHA256SUMS` 记录的校验和一致。
-- 可执行文件由 `Developer ID Application` 身份签名，identifier 为 `com.paaatrick.voice-memos-cli`、Team ID 为 `9N7UKH59LC`，带安全时间戳与 Hardened Runtime，并通过基于 Apple 公证票据的 `spctl` 校验。
+- 可执行文件由 `Developer ID Application` 身份签名，identifier 为 `com.paaatrick.voice-memos-cli`、Team ID 为 `9N7UKH59LC`，带安全时间戳与 Hardened Runtime，并满足 `codesign` 在线 `notarized` 要求。
 - 二进制同时包含 `arm64` 与 `x86_64` slice，报告的版本号符合预期，并与 `provenance.json` 一致。
 - 新版本在同一目录内原子替换旧 `vmemo`，安装失败不会破坏已有安装。
 
@@ -61,7 +61,7 @@ Verify a completed install / 验证安装结果：
 ```sh
 "$HOME/.local/bin/vmemo" --version
 codesign -d -vv "$HOME/.local/bin/vmemo" 2>&1 | grep -E 'Identifier|TeamIdentifier|Authority'
-spctl --assess --type execute --verbose=4 "$HOME/.local/bin/vmemo"
+codesign -vvvv -R='notarized' --check-notarization "$HOME/.local/bin/vmemo"
 lipo -archs "$HOME/.local/bin/vmemo"
 ```
 
