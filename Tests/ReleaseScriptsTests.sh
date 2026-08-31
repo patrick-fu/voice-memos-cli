@@ -6,7 +6,7 @@ readonly BUILD_SCRIPT="$REPOSITORY_ROOT/scripts/release/build-and-notarize.sh"
 readonly INSTALL_SCRIPT="$REPOSITORY_ROOT/install.sh"
 
 fail() { printf 'release script test failed: %s\n' "$1" >&2; exit 1; }
-require_source() { grep -Fq "$1" "$2" || fail "missing required source contract: $1"; }
+require_source() { grep -Fq -- "$1" "$2" || fail "missing required source contract: $1"; }
 
 bash -n "$BUILD_SCRIPT"
 bash -n "$INSTALL_SCRIPT"
@@ -14,6 +14,8 @@ bash -n "$INSTALL_SCRIPT"
 
 require_source 'readonly ARTIFACT_NAME="$EXECUTABLE_NAME-$VERSION-macos-universal2.zip"' "$BUILD_SCRIPT"
 require_source 'xcrun notarytool submit "$archive_path"' "$BUILD_SCRIPT"
+require_source '--wait --timeout 30m --output-format json' "$BUILD_SCRIPT"
+require_source "sed -E 's/(password|token|secret|credential)" "$BUILD_SCRIPT"
 require_source 'spctl --assess --type execute --verbose=4 "$universal_binary"' "$BUILD_SCRIPT"
 require_source "PATH='/usr/bin:/bin:/usr/sbin:/sbin'" "$BUILD_SCRIPT"
 require_source 'shasum -a 256 "$ARTIFACT_NAME" > SHA256SUMS' "$BUILD_SCRIPT"

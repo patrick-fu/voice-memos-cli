@@ -166,7 +166,9 @@ expected_entries="$PAYLOAD_NAME/"$'\n'"$PAYLOAD_NAME/$EXECUTABLE_NAME"
 [[ "$archive_entries" == "$expected_entries" ]] || fail "ZIP archive must contain only $PAYLOAD_NAME/$EXECUTABLE_NAME"
 
 verify_source_unchanged
-if ! xcrun notarytool submit "$archive_path" --keychain-profile "$notary_profile" --wait --output-format json >"$notarization_result" 2>&1; then
+if ! xcrun notarytool submit "$archive_path" --keychain-profile "$notary_profile" \
+    --wait --timeout 30m --output-format json >"$notarization_result" 2>&1; then
+    sed -E 's/(password|token|secret|credential)[^,}]*/\1=<redacted>/Ig' "$notarization_result" >&2
     fail "notarization submission failed"
 fi
 grep -Eq '"status"[[:space:]]*:[[:space:]]*"Accepted"' "$notarization_result" || fail "notarization was not accepted"
