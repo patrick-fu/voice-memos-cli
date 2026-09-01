@@ -1,5 +1,7 @@
 # Voice Memos CLI (`vmemo`)
 
+> **🌐 [产品主页 / Visit the product page](https://patrick-fu.github.io/voice-memos-cli/)**
+
 Safe, agent-friendly, read-only access to Apple Voice Memos on macOS. `vmemo` lists, searches, inspects, and exports user-owned copies of recordings; it never renames, deletes, or writes to Voice Memos.
 
 面向 agent 的安全只读 macOS 命令行工具。`vmemo` 可列出、搜索、查看和导出录音副本；绝不重命名、删除或写入 Voice Memos。
