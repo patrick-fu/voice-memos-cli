@@ -1,267 +1,217 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="system">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="vmemo 让 agent 安全读取 macOS Voice Memos。只读 CLI：list / search / show / export / doctor。v0.1.2。">
-    <meta name="theme-color" content="#0b0b0b">
-    <meta name="color-scheme" content="dark">
+    <meta name="description"
+      content="vmemo 在终端里按标题搜索 Voice Memos，并导出 .m4a 副本。原文件保持不动。">
+    <meta name="theme-color" content="#fbfaf6">
+    <meta name="color-scheme" content="light dark">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="vmemo · Voice Memos for agents">
-    <meta property="og:description" content="A safe, read-only macOS Voice Memos CLI for agents. list / search / show / export / doctor.">
-    <meta property="og:url" content="https://patrick-fu.github.io/voice-memos-cli/">
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="vmemo · Voice Memos for agents">
-    <meta name="twitter:description" content="A safe, read-only macOS Voice Memos CLI for agents.">
+    <meta property="og:title" content="vmemo · 找录音，导出副本">
+    <meta property="og:description"
+      content="vmemo 在终端里按标题搜索 Voice Memos，并导出 .m4a 副本。原文件保持不动。">
+    <meta property="og:url"
+      content="https://patrick-fu.github.io/voice-memos-cli/">
+    <meta property="og:image"
+      content="https://patrick-fu.github.io/voice-memos-cli/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt"
+      content="vmemo：找录音，导出副本，原文件保持不动">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="vmemo · 找录音，导出副本">
+    <meta name="twitter:description"
+      content="vmemo 在终端里按标题搜索 Voice Memos，并导出 .m4a 副本。原文件保持不动。">
+    <meta name="twitter:image"
+      content="https://patrick-fu.github.io/voice-memos-cli/og.png">
+    <meta name="twitter:image:alt"
+      content="vmemo：找录音，导出副本，原文件保持不动">
     <link rel="canonical" href="https://patrick-fu.github.io/voice-memos-cli/">
-    <title>vmemo · Voice Memos for agents</title>
+    <title>vmemo · 找录音，导出副本</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <script>
+    !function () {
+      var root = document.documentElement;
+      root.classList.add("js");
+      try {
+        var t = localStorage.getItem("vmemo-theme");
+        if (t === "light" || t === "dark" || t === "system") {
+          root.dataset.theme = t;
+        }
+      } catch (e) {}
+    }();
+    </script>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#content" data-zh="跳到主要内容" data-en="Skip to content">跳到主要内容</a>
-
-    <header class="site-header">
-      <a class="brand" href="#top" aria-label="vmemo 主页" data-aria-zh="vmemo 主页" data-aria-en="vmemo home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="4" fill="#141414" stroke="#2c2c2a"/>
-          <circle class="rec-dot" cx="25.5" cy="7.5" r="2.2" fill="#ff3355"/>
-          <path d="M6 21 L10 16.5 L13.5 22 L17.5 8 L21.5 24 L26 13" fill="none" stroke="#5cf2c8" stroke-width="2" stroke-linejoin="miter" stroke-linecap="square"/>
-        </svg>
-        vmemo
-      </a>
-      <nav aria-label="主导航" data-aria-zh="主导航" data-aria-en="Primary navigation">
-        <a href="#workflow" data-zh="流程" data-en="Flow">流程</a>
-        <a href="#commands" data-zh="命令" data-en="Commands">命令</a>
-        <a href="#safety" data-zh="边界" data-en="Safety">边界</a>
-        <a href="#install" data-zh="安装" data-en="Install">安装</a>
-      </nav>
-      <button class="language" type="button" aria-label="切换至英文" data-aria-zh="切换至英文" data-aria-en="Switch to Chinese" aria-pressed="false">EN</button>
+    <a class="skip-link" href="#content" data-zh="跳到主要内容"
+      data-en="Skip to content">跳到主要内容</a>
+    <header class="site-header" id="top">
+      <a class="brand" href="#top" aria-label="vmemo 主页"
+        data-aria-zh="vmemo 主页"
+        data-aria-en="vmemo home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10" fill="currentColor" opacity=".14"/><path d="M11 9v14M16 6v20M21 11v10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>vmemo</span></a>
+      <nav aria-label="主导航" data-aria-zh="主导航"
+        data-aria-en="Primary navigation"><a href="#what" data-zh="能做什么" data-en="What it does">能做什么</a><a href="#how" data-zh="怎么用" data-en="How it works">怎么用</a><a href="#reassurance" data-zh="安心" data-en="Reassurance">安心</a><a href="#install" data-zh="安装" data-en="Install">安装</a><a href="#faq">FAQ</a></nav>
+      <div
+        class="header-tools"><div class="theme-picker" aria-label="外观" data-aria-zh="外观" data-aria-en="Appearance"><button type="button" data-theme-choice="system" aria-label="跟随系统" data-aria-zh="跟随系统" data-aria-en="Use system setting" aria-pressed="true"><span aria-hidden="true">◐</span><span data-zh="系统" data-en="System">系统</span></button><button type="button" data-theme-choice="light" aria-label="浅色" data-aria-zh="浅色" data-aria-en="Light" aria-pressed="false"><span aria-hidden="true">☼</span><span data-zh="浅色" data-en="Light">浅色</span></button><button type="button" data-theme-choice="dark" aria-label="深色" data-aria-zh="深色" data-aria-en="Dark" aria-pressed="false"><span aria-hidden="true">◑</span><span data-zh="深色" data-en="Dark">深色</span></button></div><button class="language" type="button" aria-label="切换至英文" data-aria-zh="切换至英文" data-aria-en="Switch to Chinese">EN</button></div>
     </header>
-
     <main id="content">
-      <section class="hero" id="top">
-        <div class="hero-stage" aria-hidden="true">
-          <svg class="hero-wave" viewBox="0 0 1440 900" preserveAspectRatio="none">
-            <path class="wave wave-a" d="M0.0,465.0L12.0,486.9L24.0,500.1L36.0,502.3L48.0,496.4L60.0,488.3L72.0,483.5L84.0,483.7L96.0,486.1L108.0,486.4L120.0,481.7L132.0,473.0L144.0,464.6L156.0,461.0L168.0,463.9L180.0,470.7L192.0,476.1L204.0,475.5L216.0,467.8L228.0,455.8L240.0,443.7L252.0,433.8L264.0,424.9L276.0,413.3L288.0,396.2L300.0,375.4L312.0,357.3L324.0,350.1L336.0,358.4L348.0,380.0L360.0,406.3L372.0,427.0L384.0,436.4L396.0,436.5L408.0,435.4L420.0,441.8L432.0,458.4L444.0,479.6L456.0,495.3L468.0,497.1L480.0,484.9L492.0,467.8L504.0,459.1L516.0,468.0L528.0,494.2L540.0,528.1L552.0,556.5L564.0,570.5L576.0,569.8L588.0,561.2L600.0,551.8L612.0,543.8L624.0,532.1L636.0,509.4L648.0,472.4L660.0,426.6L672.0,384.0L684.0,356.4L696.0,347.8L708.0,352.0L720.0,357.0L732.0,353.9L744.0,343.5L756.0,335.4L768.0,341.3L780.0,364.7L792.0,396.3L804.0,418.4L816.0,415.8L828.0,386.4L840.0,344.9L852.0,315.0L864.0,316.4L876.0,353.1L888.0,411.6L900.0,469.6L912.0,510.1L924.0,530.6L936.0,543.0L948.0,563.2L960.0,598.5L972.0,641.3L984.0,673.3L996.0,677.2L1008.0,648.2L1020.0,597.3L1032.0,544.4L1044.0,505.8L1056.0,485.8L1068.0,476.4L1080.0,465.6L1092.0,448.0L1104.0,429.0L1116.0,419.7L1128.0,427.1L1140.0,445.5L1152.0,458.1L1164.0,446.6L1176.0,403.7L1188.0,340.1L1200.0,278.8L1212.0,242.1L1224.0,238.4L1236.0,257.5L1248.0,278.9L1260.0,286.6L1272.0,280.5L1284.0,277.1L1296.0,298.4L1308.0,356.0L1320.0,441.2L1332.0,528.4L1344.0,588.9L1356.0,607.1L1368.0,588.4L1380.0,555.2L1392.0,531.5L1404.0,529.8L1416.0,545.2L1428.0,562.2L1440.0,567.1"/>
-            <path class="wave wave-b" d="M0.0,502.8L16.0,494.2L32.0,477.4L48.0,476.6L64.0,474.6L80.0,465.1L96.0,466.1L112.0,461.7L128.0,441.6L144.0,435.8L160.0,445.5L176.0,449.9L192.0,464.6L208.0,488.0L224.0,488.8L240.0,482.9L256.0,492.5L272.0,494.0L288.0,490.4L304.0,502.1L320.0,497.6L336.0,466.7L352.0,449.4L368.0,439.3L384.0,421.4L400.0,430.0L416.0,454.1L432.0,450.9L448.0,449.2L464.0,467.5L480.0,471.3L496.0,482.5L512.0,523.8L528.0,538.6L544.0,519.6L560.0,512.0L576.0,489.6L592.0,448.0L608.0,446.2L624.0,457.0L640.0,431.8L656.0,418.2L672.0,421.2L688.0,399.2L704.0,406.9L720.0,467.1L736.0,501.2L752.0,515.1L768.0,546.5L784.0,537.8L800.0,501.7L816.0,514.9L832.0,526.7L848.0,494.2L864.0,479.2L880.0,456.6L896.0,385.8L912.0,358.4L928.0,391.0L944.0,402.6L960.0,427.0L976.0,483.0L992.0,484.7L1008.0,469.0L1024.0,514.3L1040.0,548.5L1056.0,549.6L1072.0,578.9L1088.0,569.3L1104.0,485.9L1120.0,439.1L1136.0,428.1L1152.0,390.5L1168.0,393.0L1184.0,429.2L1200.0,403.3L1216.0,377.6L1232.0,417.2L1248.0,444.9L1264.0,475.3L1280.0,558.7L1296.0,593.5L1312.0,554.8L1328.0,542.9L1344.0,528.6L1360.0,477.9L1376.0,477.6L1392.0,494.3L1408.0,438.5L1424.0,387.5L1440.0,380.2"/>
-          </svg>
-          <div class="playhead"></div>
-          <div class="spectrum"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i><i style="--i:12"></i><i style="--i:13"></i><i style="--i:14"></i><i style="--i:15"></i><i style="--i:16"></i><i style="--i:17"></i><i style="--i:18"></i><i style="--i:19"></i><i style="--i:20"></i><i style="--i:21"></i><i style="--i:22"></i><i style="--i:23"></i><i style="--i:24"></i><i style="--i:25"></i><i style="--i:26"></i><i style="--i:27"></i><i style="--i:28"></i><i style="--i:29"></i><i style="--i:30"></i><i style="--i:31"></i></div>
+      <section class="hero section-shell">
+        <div class="hero-copy reveal">
+          <p class="eyebrow" data-zh="给 Mac 上的 Voice Memos"
+            data-en="For Voice Memos on your Mac">给 Mac 上的 Voice Memos</p>
+          <h1 data-zh="找录音，导出副本，原文件保持不动。"
+            data-en="Find a recording, save a copy, leave the original untouched.">找录音，导出副本，原文件保持不动。</h1>
+          <p class="lede"
+            data-zh="vmemo 在终端里按标题搜索你的 Voice Memos，把需要的录音导出成 .m4a 副本。它不会重命名、删除或转写，也不会改动原文件。"
+            data-en="vmemo searches your Voice Memos by title in Terminal and exports the recordings you choose as .m4a copies. It does not rename, delete, or transcribe, and it does not change the original files.">vmemo 在终端里按标题搜索你的 Voice Memos，把需要的录音导出成 .m4a 副本。它不会重命名、删除或转写，也不会改动原文件。</p>
+          <div
+            class="hero-actions"><button class="button button-primary copy-button" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy install command"><span data-zh="复制安装命令" data-en="Copy install command">复制安装命令</span><span aria-hidden="true">↗</span></button><a class="button button-quiet" href="#how" data-zh="看使用步骤" data-en="See how it works">看使用步骤</a></div>
+          <p class="hero-note"
+            data-zh="v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证"
+            data-en="v0.1.2 · macOS 26 with Voice Memos build 1380 · Developer ID signed · Apple notarized">v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证</p>
         </div>
-
-        <div class="hero-copy">
-          <p class="kicker"><span class="rec-led" aria-hidden="true"></span><span data-zh="只读 · 面向 agent 的 macOS CLI" data-en="Read-only · an agent-friendly macOS CLI">只读 · 面向 agent 的 macOS CLI</span></p>
-          <h1 data-zh="让 agent 安全读取 Voice Memos" data-en="Let agents read Voice Memos safely">让 agent 安全读取 Voice Memos</h1>
-          <p class="lede" data-zh="vmemo 列出、搜索、查看并导出录音副本。没有 rename / delete，没有转写，也不会写入 Voice Memos。" data-en="vmemo lists, searches, inspects, and exports copies of recordings. No rename or delete, no transcripts, and no writes to Voice Memos.">vmemo 列出、搜索、查看并导出录音副本。没有 rename / delete，没有转写，也不会写入 Voice Memos。</p>
-
-          <div class="install-line">
-            <span class="prompt" aria-hidden="true">$</span>
-            <pre><code id="install-command">curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.2/install.sh | sh</code></pre>
-            <button class="copy" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy the install command">
-              <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-              <svg class="icon icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
-              <span class="copy-label" data-zh="复制" data-en="Copy">复制</span>
-            </button>
+        <div class="product-preview reveal" aria-hidden="true">
+          <div class="preview-window">
+            <div
+              class="preview-topbar"><span class="preview-dots" aria-hidden="true"><i></i><i></i><i></i></span><span data-zh="你的录音" data-en="Your recordings">你的录音</span><small data-zh="界面示意" data-en="Interface example">界面示意</small></div>
+            <div class="preview-body">
+              <div
+                class="search-field"><span aria-hidden="true">⌕</span><span data-zh="按标题查找" data-en="Search by title">按标题查找</span></div>
+              <ul class="recording-list" aria-hidden="true">
+                <li><span class="recording-icon">♪</span><span><b data-zh="录音" data-en="Recording">录音</b><small>m4a</small></span><em>···</em></li>
+                <li
+                  class="selected"><span class="recording-icon">♪</span><span><b data-zh="录音" data-en="Recording">录音</b><small>m4a</small></span><em>···</em></li>
+                <li><span class="recording-icon">♪</span><span><b data-zh="录音" data-en="Recording">录音</b><small>m4a</small></span><em>···</em></li>
+              </ul>
+              <div
+                class="export-card"><div><span class="export-icon" aria-hidden="true">↓</span><span><b data-zh="导出副本" data-en="Save a copy">导出副本</b><small data-zh="原文件保持不动" data-en="Original stays untouched">原文件保持不动</small></span></div><span class="copy-tag">.m4a</span></div>
+            </div>
           </div>
-          <p class="copy-live" role="status" aria-live="polite"></p>
-
-          <p class="hero-meta">
-            <span data-zh="v0.1.2 · 仅 macOS 26 + Voice Memos build 1380 · Developer ID signed · Apple notarized · universal2" data-en="v0.1.2 · macOS 26 + Voice Memos build 1380 only · Developer ID signed · Apple notarized · universal2">v0.1.2 · 仅 macOS 26 + Voice Memos build 1380 · Developer ID signed · Apple notarized · universal2</span>
-            <a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli">GitHub</a>
-          </p>
         </div>
-
-        <ol class="ruler" aria-hidden="true">
-          <li>00:00</li>
-          <li>doctor</li>
-          <li>list / search</li>
-          <li>show / export</li>
+      </section>
+      <section class="section-shell section" id="what">
+        <div class="section-heading reveal">
+          <p class="eyebrow" data-zh="能做什么"
+            data-en="What it does">能做什么</p>
+          <h2 data-zh="三项能力"
+            data-en="Three things it does">三项能力</h2>
+        </div>
+        <div class="feature-grid">
+          <article
+            class="feature-card reveal"><span class="feature-icon" aria-hidden="true">⌕</span><h3 data-zh="按标题查找" data-en="Search by title">按标题查找</h3><p data-zh="在终端里查看你的录音列表，再按标题找到需要的那一段。" data-en="View your recordings in Terminal, then find the one you need by title.">在终端里查看你的录音列表，再按标题找到需要的那一段。</p></article>
+          <article
+            class="feature-card reveal"><span class="feature-icon" aria-hidden="true">↓</span><h3 data-zh="导出副本" data-en="Save a copy">导出副本</h3><p data-zh="把需要的录音导出成 .m4a，放到你自己选的位置，原文件保持不动。" data-en="Export the recordings you choose as .m4a files to a location you pick. The originals stay untouched.">把需要的录音导出成 .m4a，放到你自己选的位置，原文件保持不动。</p></article>
+          <article
+            class="feature-card reveal"><span class="feature-icon" aria-hidden="true">✓</span><h3 data-zh="先检查再使用" data-en="Check before use">先检查再使用</h3><p data-zh="读取前先检查你的 Mac、应用版本和权限是否满足要求。状态不对就停下。" data-en="Before reading, check that your Mac, app version, and permissions meet the requirements. It stops when they do not.">读取前先检查你的 Mac、应用版本和权限是否满足要求。状态不对就停下。</p></article>
+        </div>
+      </section>
+      <section class="section-shell section how-section" id="how">
+        <div class="section-heading reveal">
+          <p class="eyebrow" data-zh="从这里开始"
+            data-en="Start here">从这里开始</p>
+          <h2 data-zh="三步使用" data-en="How it works">三步使用</h2>
+        </div>
+        <ol class="steps">
+          <li
+            class="reveal"><span>1</span><div><h3 data-zh="打开终端" data-en="Open Terminal">打开终端</h3><p data-zh="从启动台或应用程序 › 实用工具打开终端。" data-en="Open Terminal from Launchpad or Applications › Utilities.">从启动台或应用程序 › 实用工具打开终端。</p></div></li>
+          <li
+            class="reveal"><span>2</span><div><h3 data-zh="粘贴安装命令" data-en="Paste the install command">粘贴安装命令</h3><p data-zh="复制安装区里的命令并运行。" data-en="Copy and run the command in the install section.">复制安装区里的命令并运行。</p></div></li>
+          <li
+            class="reveal"><span>3</span><div><h3 data-zh="先运行检查" data-en="Run the check first">先运行检查</h3><p data-zh="确认当前 Mac 和应用版本匹配，再查看、搜索和导出录音。" data-en="Confirm that your Mac and app version match, then view, search, and export recordings.">确认当前 Mac 和应用版本匹配，再查看、搜索和导出录音。</p></div></li>
         </ol>
       </section>
-
-      <section class="band workflow" id="workflow">
-        <div class="band-inner">
-          <header class="band-head reveal">
-            <p class="kicker" data-zh="Agent 工作流" data-en="Agent workflow">Agent 工作流</p>
-            <h2 data-zh="先准入，再拿 ID，最后只复制。" data-en="Admit first, take IDs, copy only.">先准入，再拿 ID，最后只复制。</h2>
-            <p data-zh="每个命令都有稳定 exit code 与 JSON v1 envelope。不要做 UI 自动化，也不要从标题或路径推导 ID。" data-en="Every command has stable exit codes and a JSON v1 envelope. Do not drive the UI, and do not derive IDs from titles or paths.">每个命令都有稳定 exit code 与 JSON v1 envelope。不要做 UI 自动化，也不要从标题或路径推导 ID。</p>
-          </header>
-
-          <ol class="tracks">
-            <li class="reveal">
-              <span class="idx">01</span>
-              <div class="track-copy">
-                <code>doctor</code>
-                <p data-zh="先验证系统、App、library、schema 与签名。未 ready 就停止。" data-en="Validate runtime, app, library, schema, and signing. Stop unless ready.">先验证系统、App、library、schema 与签名。未 ready 就停止。</p>
-              </div>
-              <div class="lane" aria-hidden="true"><span class="clip" style="--x:2%;--w:28%"></span></div>
-            </li>
-            <li class="reveal">
-              <span class="idx">02</span>
-              <div class="track-copy">
-                <code>list</code> / <code>search</code>
-                <p data-zh="列出 active recordings，或按标题做大小写不敏感搜索，拿到 opaque ID。" data-en="List active recordings, or search titles case-insensitively, and reuse the opaque ID.">列出 active recordings，或按标题做大小写不敏感搜索，拿到 opaque ID。</p>
-              </div>
-              <div class="lane" aria-hidden="true"><span class="clip" style="--x:30%;--w:34%"></span></div>
-            </li>
-            <li class="reveal">
-              <span class="idx">03</span>
-              <div class="track-copy">
-                <code>show</code> / <code>export</code>
-                <p data-zh="确认目标，或把本地 .m4a 复制到一个尚不存在的路径。源录音保持原样。" data-en="Inspect the target, or copy a local .m4a to a path that does not yet exist. Source recordings stay untouched.">确认目标，或把本地 .m4a 复制到一个尚不存在的路径。源录音保持原样。</p>
-              </div>
-              <div class="lane" aria-hidden="true"><span class="clip" style="--x:64%;--w:34%"></span></div>
-            </li>
-          </ol>
-        </div>
-      </section>
-
-      <section class="band commands" id="commands">
-        <div class="band-inner commands-grid">
-          <header class="band-head reveal">
-            <p class="kicker" data-zh="命令面" data-en="Command surface">命令面</p>
-            <h2 data-zh="五个命令，没有第六个。" data-en="Five commands. There is no sixth.">五个命令，没有第六个。</h2>
-            <p data-zh="这是本地示例 envelope，不会读取本机 Voice Memos，也不把示例标题当成真实数据。" data-en="This is a local example envelope. It does not read Voice Memos on this machine, and example titles are placeholders.">这是本地示例 envelope，不会读取本机 Voice Memos，也不把示例标题当成真实数据。</p>
-          </header>
-
-          <div class="mixer reveal">
-            <div class="command-list" role="tablist" aria-orientation="vertical" aria-label="示例命令" data-aria-zh="示例命令" data-aria-en="Example commands">
-              <button type="button" class="cmd" role="tab" aria-selected="true" aria-controls="demo-panel" id="tab-doctor" data-demo="doctor"><span>01</span><code>doctor</code><small data-zh="只读准入检查" data-en="Read-only admission">只读准入检查</small></button>
-              <button type="button" class="cmd" role="tab" aria-selected="false" aria-controls="demo-panel" id="tab-list" data-demo="list"><span>02</span><code>list</code><small data-zh="列出 active recordings" data-en="List active recordings">列出 active recordings</small></button>
-              <button type="button" class="cmd" role="tab" aria-selected="false" aria-controls="demo-panel" id="tab-search" data-demo="search"><span>03</span><code>search</code><small data-zh="只搜标题" data-en="Title search only">只搜标题</small></button>
-              <button type="button" class="cmd" role="tab" aria-selected="false" aria-controls="demo-panel" id="tab-show" data-demo="show"><span>04</span><code>show</code><small data-zh="按 opaque ID 查看" data-en="Inspect by opaque ID">按 opaque ID 查看</small></button>
-              <button type="button" class="cmd" role="tab" aria-selected="false" aria-controls="demo-panel" id="tab-export" data-demo="export"><span>05</span><code>export</code><small data-zh="复制 .m4a 副本" data-en="Copy an .m4a file">复制 .m4a 副本</small></button>
-            </div>
-            <button class="play-seq" type="button" aria-label="按顺序演示 doctor 到 export" data-aria-zh="按顺序演示 doctor 到 export" data-aria-en="Play the doctor-to-export sequence">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
-              <span class="play-label" data-zh="按顺序演示" data-en="Play sequence">按顺序演示</span>
-            </button>
+      <section class="reassurance-wrap" id="reassurance">
+        <div class="section-shell reassurance reveal">
+          <div>
+            <p class="eyebrow" data-zh="安心"
+              data-en="Reassurance">安心</p>
+            <h2 data-zh="你的录音不会被改动"
+              data-en="Your recordings stay as they are">你的录音不会被改动</h2>
+            <p
+              data-zh="vmemo 提供查看、搜索、确认和导出副本。它不会重命名、删除或转写，也不会直接写 Voice Memos 的数据。"
+              data-en="vmemo inspects, searches, confirms, and exports copies. It does not rename, delete, or transcribe, and it does not write directly to Voice Memos data.">vmemo 提供查看、搜索、确认和导出副本。它不会重命名、删除或转写，也不会直接写 Voice Memos 的数据。</p>
           </div>
-
-          <aside class="console reveal" id="demo-panel" role="tabpanel" aria-labelledby="tab-doctor" data-aria-zh="JSON 示例输出" data-aria-en="Example JSON output" aria-label="JSON 示例输出">
-            <div class="console-top">
-              <span class="console-name">vmemo · json v1</span>
-              <span class="console-note" data-zh="示例输出 · stdout" data-en="Example output · stdout">示例输出 · stdout</span>
-            </div>
-            <pre class="console-body"><code id="demo-output"><span class="prompt-line">$ <span class="cmd-text">vmemo doctor --json</span></span>
-{
-  <span class="tok-key">&quot;version&quot;</span>: <span class="tok-num">1</span>,
-  <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ok&quot;</span>,
-  <span class="tok-key">&quot;data&quot;</span>: {
-    <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-    <span class="tok-key">&quot;checks&quot;</span>: [
-      {
-        <span class="tok-key">&quot;id&quot;</span>: <span class="tok-str">&quot;runtime&quot;</span>,
-        <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-        <span class="tok-key">&quot;code&quot;</span>: <span class="tok-str">&quot;runtime_supported&quot;</span>,
-        <span class="tok-key">&quot;details&quot;</span>: []
-      },
-      {
-        <span class="tok-key">&quot;id&quot;</span>: <span class="tok-str">&quot;voice_memos&quot;</span>,
-        <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-        <span class="tok-key">&quot;code&quot;</span>: <span class="tok-str">&quot;app_available&quot;</span>,
-        <span class="tok-key">&quot;details&quot;</span>: []
-      },
-      {
-        <span class="tok-key">&quot;id&quot;</span>: <span class="tok-str">&quot;library&quot;</span>,
-        <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-        <span class="tok-key">&quot;code&quot;</span>: <span class="tok-str">&quot;library_accessible&quot;</span>,
-        <span class="tok-key">&quot;details&quot;</span>: []
-      },
-      {
-        <span class="tok-key">&quot;id&quot;</span>: <span class="tok-str">&quot;schema&quot;</span>,
-        <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-        <span class="tok-key">&quot;code&quot;</span>: <span class="tok-str">&quot;schema_recognized&quot;</span>,
-        <span class="tok-key">&quot;details&quot;</span>: []
-      },
-      {
-        <span class="tok-key">&quot;id&quot;</span>: <span class="tok-str">&quot;signing&quot;</span>,
-        <span class="tok-key">&quot;status&quot;</span>: <span class="tok-str">&quot;ready&quot;</span>,
-        <span class="tok-key">&quot;code&quot;</span>: <span class="tok-str">&quot;signing_metadata_available&quot;</span>,
-        <span class="tok-key">&quot;details&quot;</span>: []
-      }
-    ]
-  }
-}</code></pre>
-            <div class="console-foot">
-              <span id="demo-exit">exit 0</span>
-              <span data-zh="失败走 stderr；doctor 报告始终在 stdout" data-en="Failures go to stderr; doctor reports always on stdout">失败走 stderr；doctor 报告始终在 stdout</span>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section class="band safety" id="safety">
-        <div class="band-inner safety-grid">
-          <header class="band-head reveal">
-            <p class="kicker" data-zh="安全边界" data-en="Safety boundary">安全边界</p>
-            <h2 data-zh="能读，不等于能改。" data-en="Read access is not write access.">能读，不等于能改。</h2>
-            <p data-zh="vmemo 用临时 SQLite snapshot 读取，环境或 schema 不匹配就 fail closed。不需要 Accessibility，不发送 Apple Events，也不使用 mutation token。" data-en="vmemo reads through a temporary SQLite snapshot and fails closed on an environment or schema mismatch. No Accessibility, no Apple Events, no mutation tokens.">vmemo 用临时 SQLite snapshot 读取，环境或 schema 不匹配就 fail closed。不需要 Accessibility，不发送 Apple Events，也不使用 mutation token。</p>
-          </header>
-          <ul class="gates">
-            <li class="reveal"><span class="gate-led" aria-hidden="true"></span><span data-zh="没有 rename / delete / 转写命令" data-en="No rename, delete, or transcript commands">没有 rename / delete / 转写命令</span></li>
-            <li class="reveal"><span class="gate-led" aria-hidden="true"></span><span data-zh="不直接写 Voice Memos 数据库、asset 或 CloudKit" data-en="No direct writes to the Voice Memos database, assets, or CloudKit">不直接写 Voice Memos 数据库、asset 或 CloudKit</span></li>
-            <li class="reveal"><span class="gate-led" aria-hidden="true"></span><span data-zh="生产数据路径仅 macOS 26 + Voice Memos build 1380" data-en="Production data path: macOS 26 + Voice Memos build 1380 only">生产数据路径仅 macOS 26 + Voice Memos build 1380</span></li>
-            <li class="reveal"><span class="gate-led" aria-hidden="true"></span><span data-zh="录音标题只出现在调用方请求的 stdout" data-en="Recording titles appear only in caller-requested stdout">录音标题只出现在调用方请求的 stdout</span></li>
+          <ul>
+            <li data-zh="只导出副本，不改原文件"
+              data-en="Exports copies only">只导出副本，不改原文件</li>
+            <li data-zh="不使用界面自动化"
+              data-en="No UI automation">不使用界面自动化</li>
+            <li data-zh="只在你的 Mac 本地运行"
+              data-en="Runs only on your Mac">只在你的 Mac 本地运行</li>
+            <li data-zh="录音标题只出现在你主动运行的命令结果里"
+              data-en="Recording titles appear only in the command output you run">录音标题只出现在你主动运行的命令结果里</li>
           </ul>
         </div>
       </section>
-
-      <section class="band install" id="install">
-        <div class="band-inner">
-          <header class="band-head reveal">
-            <p class="kicker" data-zh="安装" data-en="Install">安装</p>
-            <h2 data-zh="装进 ~/.local/bin/vmemo，不要 sudo。" data-en="Install to ~/.local/bin/vmemo. No sudo.">装进 ~/.local/bin/vmemo，不要 sudo。</h2>
-            <p data-zh="安装脚本从不可变 GitHub Release 拉取 Apple 公证的 universal2 ZIP，逐项校验后再原子写入。不弹安装器，也不改你的 shell 配置。" data-en="The installer pulls the Apple-notarized universal2 ZIP from an immutable GitHub Release, verifies it, then writes atomically. No installer GUI, and no edits to your shell config.">安装脚本从不可变 GitHub Release 拉取 Apple 公证的 universal2 ZIP，逐项校验后再原子写入。不弹安装器，也不改你的 shell 配置。</p>
-          </header>
-
-          <div class="install-line install-line-block reveal">
-            <span class="prompt" aria-hidden="true">$</span>
-            <pre><code>curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.2/install.sh | sh</code></pre>
-            <button class="copy" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy the install command">
-              <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-              <svg class="icon icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
-              <span class="copy-label" data-zh="复制" data-en="Copy">复制</span>
-            </button>
+      <section class="section-shell section install-section" id="install">
+        <div class="install-panel reveal">
+          <div>
+            <p class="eyebrow" data-zh="安装"
+              data-en="Install">安装</p>
+            <h2 data-zh="安装 vmemo" data-en="Install vmemo">安装 vmemo</h2>
+            <p
+              data-zh="打开终端，粘贴下面这行命令。脚本会默认把 vmemo 安装到 ~/.local/bin/vmemo，这是已签名、已公证的 universal2 版本，不需要 sudo，也不弹安装器。"
+              data-en="Open Terminal and paste the command below. It installs a signed, notarized universal2 build to ~/.local/bin/vmemo by default, without sudo or an installer window.">打开终端，粘贴下面这行命令。脚本会默认把 vmemo 安装到 ~/.local/bin/vmemo，这是已签名、已公证的 universal2 版本，不需要 sudo，也不弹安装器。</p>
           </div>
-
-          <dl class="facts">
-            <div class="reveal"><dt data-zh="签名与公证" data-en="Signing &amp; notarization">签名与公证</dt><dd data-zh="Developer ID Application 签名、安全时间戳、Hardened Runtime；codesign 在线校验 Apple 公证票据。" data-en="Developer ID Application signature, secure timestamp, Hardened Runtime; codesign checks Apple's notarization ticket online.">Developer ID Application 签名、安全时间戳、Hardened Runtime；codesign 在线校验 Apple 公证票据。</dd></div>
-            <div class="reveal"><dt data-zh="发布物" data-en="Release artifact">发布物</dt><dd data-zh="不可变 Release；ZIP 与 SHA256SUMS 一致；arm64 + x86_64；版本与 provenance 对齐。" data-en="Immutable release; ZIP matches SHA256SUMS; arm64 + x86_64; version matches provenance.">不可变 Release；ZIP 与 SHA256SUMS 一致；arm64 + x86_64；版本与 provenance 对齐。</dd></div>
-            <div class="reveal"><dt data-zh="PATH" data-en="PATH">PATH</dt><dd data-zh="默认 ~/.local/bin/vmemo。若该目录不在 PATH 中，脚本只打印应执行的命令。换目录用 VMEMO_INSTALL_DIR，选版本用 VMEMO_VERSION。" data-en="Default: ~/.local/bin/vmemo. If that directory is not on PATH, the script only prints the command to add it. VMEMO_INSTALL_DIR changes the directory; VMEMO_VERSION selects another published version.">默认 ~/.local/bin/vmemo。若该目录不在 PATH 中，脚本只打印应执行的命令。换目录用 VMEMO_INSTALL_DIR，选版本用 VMEMO_VERSION。</dd></div>
-            <div class="reveal"><dt data-zh="权限" data-en="Permissions">权限</dt><dd data-zh="安装本身不需要 Full Disk Access。读取录音时你可能仍需在「系统设置 › 隐私与安全性」中授权；只有用户能授予，vmemo doctor 会报告状态。" data-en="Installing needs no Full Disk Access. Reading memos may still require access in System Settings › Privacy &amp; Security; only you can grant it, and vmemo doctor reports the state.">安装本身不需要 Full Disk Access。读取录音时你可能仍需在「系统设置 › 隐私与安全性」中授权；只有用户能授予，vmemo doctor 会报告状态。</dd></div>
-          </dl>
-
-          <div class="source reveal">
-            <div class="source-label"><span data-zh="次要路径 · 源码构建" data-en="Secondary path · source build">次要路径 · 源码构建</span><span class="warn" data-zh="无签名" data-en="unsigned">无签名</span></div>
-            <pre><code>git clone https://github.com/patrick-fu/voice-memos-cli.git
-cd voice-memos-cli
-swift build -c release
-.build/release/vmemo doctor
-.build/release/vmemo list --json</code></pre>
-          </div>
-
-          <p class="compat reveal" data-zh="生产数据路径只支持 macOS 26 与 Voice Memos build 1380。其他系统与 build 会安全地返回 unsupported。" data-en="The production data path supports macOS 26 and Voice Memos build 1380 only. Other systems and builds safely return unsupported.">生产数据路径只支持 macOS 26 与 Voice Memos build 1380。其他系统与 build 会安全地返回 unsupported。</p>
-          <p class="release-link reveal"><a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli/releases" data-zh="查看 GitHub Releases" data-en="View GitHub Releases">查看 GitHub Releases</a></p>
+          <div
+            class="install-command-wrap"><div class="command-box"><code id="install-command">curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.2/install.sh | sh</code><button class="copy-button icon-button" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy install command"><span aria-hidden="true">⧉</span><span class="visually-hidden" data-zh="复制安装命令" data-en="Copy install command">复制安装命令</span></button></div><button class="button button-primary copy-button" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy install command"><span data-zh="复制安装命令" data-en="Copy install command">复制安装命令</span></button><p class="microcopy" data-zh="v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证 · universal2" data-en="v0.1.2 · macOS 26 with Voice Memos build 1380 · Developer ID signed · Apple notarized · universal2">v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证 · universal2</p><p class="microcopy" data-zh="安装不需要 Full Disk Access。首次读取录音时，macOS 可能要求你在“系统设置 › 隐私与安全性”中授权，只有你能授权。安装后运行 vmemo doctor 可以查看当前状态。" data-en="Installing needs no Full Disk Access. When recordings are first read, macOS may ask you to grant access in System Settings › Privacy & Security; only you can grant it. After installing, run vmemo doctor to see the current state.">安装不需要 Full Disk Access。首次读取录音时，macOS 可能要求你在“系统设置 › 隐私与安全性”中授权，只有你能授权。安装后运行 vmemo doctor 可以查看当前状态。</p><a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli/releases" data-zh="查看 GitHub Releases" data-en="View GitHub Releases">查看 GitHub Releases</a></div>
         </div>
       </section>
-
-      <section class="band privacy" id="privacy">
-        <div class="band-inner reveal">
-          <p class="kicker" data-zh="隐私" data-en="Privacy">隐私</p>
-          <h2 data-zh="录音不会经过本网站。" data-en="Recordings never pass through this site.">录音不会经过本网站。</h2>
-          <p data-zh="这是纯静态 GitHub Pages：没有分析脚本、追踪像素、外部字体或 CDN。vmemo 只在本地运行。调用它的 agent 不要把录音标题、搜索词或含标题的路径写进日志。" data-en="This is static GitHub Pages: no analytics, tracking pixels, external fonts, or CDNs. vmemo runs locally. Agents should not log recording titles, search queries, or title-bearing paths.">这是纯静态 GitHub Pages：没有分析脚本、追踪像素、外部字体或 CDN。vmemo 只在本地运行。调用它的 agent 不要把录音标题、搜索词或含标题的路径写进日志。</p>
-          <a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli/blob/main/docs/agent-contract.md" data-zh="阅读 Agent Contract" data-en="Read the Agent Contract">阅读 Agent Contract</a>
+      <section class="section-shell section faq-section" id="faq">
+        <div class="section-heading reveal">
+          <p class="eyebrow">FAQ</p>
+          <h2 data-zh="常见问题"
+            data-en="Common questions">常见问题</h2>
+        </div>
+        <div class="faq-list reveal">
+          <details>
+            <summary data-zh="支持哪些系统？"
+              data-en="Which systems are supported?">支持哪些系统？</summary>
+            <p
+              data-zh="v0.1.2 只支持 macOS 26 与 Voice Memos build 1380。其他系统或版本会安全提示不支持。"
+              data-en="v0.1.2 supports macOS 26 with Voice Memos build 1380 only. Other systems or versions report unsupported instead of guessing.">v0.1.2 只支持 macOS 26 与 Voice Memos build 1380。其他系统或版本会安全提示不支持。</p>
+          </details>
+          <details>
+            <summary data-zh="第一次使用为什么会要求权限？"
+              data-en="Why does it ask for permissions the first time?">第一次使用为什么会要求权限？</summary>
+            <p
+              data-zh="读取录音时，macOS 可能要求你授予“完全磁盘访问权限”或容器权限。只有你能授权，vmemo 不会替你改设置。"
+              data-en="macOS may ask for Full Disk Access or another container permission when recordings are read. Only you can grant it; vmemo does not change settings for you.">读取录音时，macOS 可能要求你授予“完全磁盘访问权限”或容器权限。只有你能授权，vmemo 不会替你改设置。</p>
+          </details>
+          <details>
+            <summary data-zh="录音会被传到网上吗？"
+              data-en="Are recordings sent anywhere?">录音会被传到网上吗？</summary>
+            <p
+              data-zh="不会。vmemo 只在本地运行，导出也只是把一份 .m4a 复制到你选择的位置。"
+              data-en="No. vmemo runs locally. Export copies an .m4a to a location you choose.">不会。vmemo 只在本地运行，导出也只是把一份 .m4a 复制到你选择的位置。</p>
+          </details>
+          <details>
+            <summary data-zh="它会修改、删除或转写录音吗？"
+              data-en="Does it modify, delete, or transcribe recordings?">它会修改、删除或转写录音吗？</summary>
+            <p
+              data-zh="不会。vmemo 只能查看、搜索、确认和导出副本，导出的副本不会改动原文件。"
+              data-en="No. vmemo only inspects, searches, confirms, and exports copies. Export does not change the original file.">不会。vmemo 只能查看、搜索、确认和导出副本，导出的副本不会改动原文件。</p>
+          </details>
+          <details>
+            <summary data-zh="装在哪里？"
+              data-en="Where does it install?">装在哪里？</summary>
+            <p
+              data-zh="默认安装到 ~/.local/bin/vmemo。脚本不会修改 shell 配置；如果这个目录不在 PATH 中，脚本会提示需要运行的命令。"
+              data-en="It installs to ~/.local/bin/vmemo by default. The script does not edit your shell config; if that directory is not on PATH, it prints the command to add it.">默认安装到 ~/.local/bin/vmemo。脚本不会修改 shell 配置；如果这个目录不在 PATH 中，脚本会提示需要运行的命令。</p>
+          </details>
         </div>
       </section>
     </main>
-
-    <footer>
-      <span>vmemo</span>
-      <span data-zh="安全的只读 Voice Memos CLI" data-en="A safe, read-only Voice Memos CLI">安全的只读 Voice Memos CLI</span>
-      <a href="https://github.com/patrick-fu/voice-memos-cli">GitHub</a>
+    <footer class="site-footer">
+      <div class="section-shell">
+        <div><a class="brand" href="#top" aria-label="vmemo 主页" data-aria-zh="vmemo 主页" data-aria-en="vmemo home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10" fill="currentColor" opacity=".14"/><path d="M11 9v14M16 6v20M21 11v10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>vmemo</span></a><p data-zh="只读使用 Voice Memos" data-en="A read-only way to use Voice Memos">只读使用 Voice Memos</p></div>
+        <div><a class="text-link" href="https://github.com/patrick-fu/voice-memos-cli">GitHub</a><p data-zh="v0.1.2 · 纯静态页面 · 无追踪" data-en="v0.1.2 · Static page · No tracking">v0.1.2 · 纯静态页面 · 无追踪</p></div>
+      </div>
     </footer>
+    <p class="copy-live" id="copy-status" role="status"
+      aria-live="polite" aria-atomic="true"></p>
     <script src="script.js"></script>
   </body>
 </html>
