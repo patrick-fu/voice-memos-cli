@@ -218,8 +218,19 @@ nav a:hover,
   text-underline-offset: .24em;
 }
 .nav-repo-link {
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: .65rem;
   color: var(--sage-deep);
-  font-weight: 700;
+}
+.nav-repo-link:hover {
+  background: var(--sage-soft);
+  text-decoration: none;
+}
+.github-mark {
+  width: 22px;
+  height: 22px;
 }
 .header-tools {
   display: flex;
@@ -328,11 +339,17 @@ nav a:hover,
   font-weight: 700;
   cursor: pointer;
 }
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: .55rem;
+}
 .hero-step-link {
   display: inline-flex;
   align-items: center;
+  gap: .3rem;
   min-height: 44px;
-  margin-top: .55rem;
   font-size: .9rem;
 }
 .button {
