@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="vmemo"><rect width="64" height="64" rx="18" fill="#e2e9df"/><path d="M20 19v26M32 12v40M44 23v18" fill="none" stroke="#425b49" stroke-width="7" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="vmemo">
+  <style>
+    .bg { fill: #f5f5f7; }
+    .wave { stroke: #1d1d1f; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1d1d1f; }
+      .wave { stroke: #f5f5f7; }
+    }
+  </style>
+  <rect class="bg" width="64" height="64" rx="16"/>
+  <path class="wave" d="M20 19v26M32 12v40M44 23v18" fill="none" stroke-width="7" stroke-linecap="round"/>
+</svg>
