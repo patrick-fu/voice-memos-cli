@@ -66,8 +66,22 @@
           <p class="lede"
             data-zh="vmemo 在终端里按标题搜索你的 Voice Memos，把需要的录音导出成 .m4a 副本。它不会重命名、删除或转写，也不会改动原文件。"
             data-en="vmemo searches your Voice Memos by title in Terminal and exports the recordings you choose as .m4a copies. It does not rename, delete, or transcribe, and it does not change the original files.">vmemo 在终端里按标题搜索你的 Voice Memos，把需要的录音导出成 .m4a 副本。它不会重命名、删除或转写，也不会改动原文件。</p>
-          <div
-            class="hero-actions"><button class="button button-primary copy-button" type="button" data-copy-target="install-command" data-copied-zh="已复制" data-copied-en="Copied" data-failed-zh="复制失败" data-failed-en="Copy failed" aria-label="复制安装命令" data-aria-zh="复制安装命令" data-aria-en="Copy install command"><span data-zh="复制安装命令" data-en="Copy install command">复制安装命令</span><span aria-hidden="true">↗</span></button><a class="button button-quiet" href="#how" data-zh="看使用步骤" data-en="See how it works">看使用步骤</a></div>
+          <div class="hero-install">
+            <div class="command-box hero-command-box">
+              <span class="command-prompt" aria-hidden="true">$</span>
+              <code
+                id="hero-install-command">curl -fsSL https://raw.githubusercontent.com/patrick-fu/voice-memos-cli/v0.1.2/install.sh | sh</code>
+              <button class="copy-button hero-copy-button" type="button"
+                data-copy-target="hero-install-command" data-copied-zh="已复制"
+                data-copied-en="Copied" data-failed-zh="复制失败"
+                data-failed-en="Copy failed" aria-label="复制安装命令"
+                data-aria-zh="复制安装命令"
+                data-aria-en="Copy install command"><span aria-hidden="true">⧉</span><span
+                  data-zh="复制" data-en="Copy">复制</span></button>
+            </div>
+            <a class="hero-step-link text-link" href="#how" data-zh="看使用步骤"
+              data-en="See how it works">看使用步骤</a>
+          </div>
           <p class="hero-note"
             data-zh="v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证"
             data-en="v0.1.2 · macOS 26 with Voice Memos build 1380 · Developer ID signed · Apple notarized">v0.1.2 · macOS 26 与 Voice Memos build 1380 · Developer ID 签名 · Apple 公证</p>

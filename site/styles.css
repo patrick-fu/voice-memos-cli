@@ -280,11 +280,51 @@ nav a:hover,
   margin-top: 1.35rem;
   font-size: clamp(1.05rem,1.6vw,1.2rem);
 }
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .75rem;
+.hero-copy {
+  min-width: 0;
+}
+.hero-install {
   margin-top: 2rem;
+}
+.hero-command-box {
+  width: 100%;
+  max-width: 42rem;
+  min-width: 0;
+  padding: .35rem;
+}
+.hero-command-box code {
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.command-prompt {
+  align-self: center;
+  padding-left: .55rem;
+  color: var(--sage);
+  font: 700 .82rem var(--mono);
+}
+.hero-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  flex: none;
+  min-width: 78px;
+  min-height: 44px;
+  padding: 0 .75rem;
+  border: 0;
+  border-radius: .55rem;
+  color: var(--on-primary);
+  background: var(--sage-deep);
+  font-weight: 700;
+  cursor: pointer;
+}
+.hero-step-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: .55rem;
+  font-size: .9rem;
 }
 .button {
   display: inline-flex;
@@ -710,6 +750,10 @@ nav a:hover,
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .hero-command-box code {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
 }
 @media (max-width:680px) {
   .section-shell {
@@ -735,12 +779,12 @@ nav a:hover,
   .hero {
     padding-block: 3.6rem;
   }
-  .hero-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
   .button {
     width: 100%;
+  }
+  .hero-copy-button {
+    min-width: 72px;
+    padding-inline: .6rem;
   }
   .product-preview {
     margin-top: .2rem;
