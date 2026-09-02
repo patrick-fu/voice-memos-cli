@@ -217,6 +217,10 @@ nav a:hover,
   text-decoration: underline;
   text-underline-offset: .24em;
 }
+.nav-repo-link {
+  color: var(--sage-deep);
+  font-weight: 700;
+}
 .header-tools {
   display: flex;
   align-items: center;
@@ -563,6 +567,15 @@ nav a:hover,
 }
 .reassurance h2 {
   margin-bottom: 1rem;
+}
+.reassurance-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 44px;
+  margin-top: .75rem;
+  color: var(--sage-deep);
+  font-weight: 700;
 }
 .reassurance ul {
   display: grid;
