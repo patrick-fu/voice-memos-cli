@@ -295,7 +295,11 @@ nav a:hover,
 .hero-command-box code {
   min-width: 0;
   overflow-x: auto;
+  scrollbar-width: none;
   white-space: nowrap;
+}
+.hero-command-box code::-webkit-scrollbar {
+  display: none;
 }
 .command-prompt {
   align-self: center;
