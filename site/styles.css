@@ -293,6 +293,7 @@ nav a:hover,
   padding: .35rem;
 }
 .hero-command-box code {
+  align-self: center;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
